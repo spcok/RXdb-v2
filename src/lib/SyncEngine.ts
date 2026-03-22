@@ -3,9 +3,17 @@ import { getRxStorageDexie } from 'rxdb/plugins/storage-dexie';
 import { RxDBDevModePlugin } from 'rxdb/plugins/dev-mode';
 import { wrappedValidateAjvStorage } from 'rxdb/plugins/validate-ajv';
 import { replicateSupabase, RxSupabaseReplicationState } from 'rxdb/plugins/replication-supabase';
-import { supabase } from './supabase';
+
+// 🚨 THE FIX: Import createClient directly.
+import { createClient } from '@supabase/supabase-js';
 
 addRxPlugin(RxDBDevModePlugin);
+
+// 🚨 THE ISOLATION: Create a dedicated Supabase client right here. 
+// This completely bypasses the Vite circular dependency bug.
+const SUPABASE_URL = 'https://dgnncauvnzivsxxiifvs.supabase.co'; 
+const SUPABASE_ANON_KEY = 'sb_publishable_r0yjFsdxKolSme2t2iUs4Q_F0zIenxX';
+const isolatedSupabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 export let databaseInstance: RxDatabase;
 let dbInitPromise: Promise<RxDatabase> | null = null;
@@ -31,8 +39,8 @@ const baseColumns = { id: { type: 'string', maxLength: 100 }, created_at: { type
 export const bootDatabase = async () => {
   if (dbInitPromise) return dbInitPromise;
   dbInitPromise = (async () => {
-    console.log('💾 [Engine] Booting v25...');
-    databaseInstance = await createRxDatabase({ name: 'animaldb_v25', storage: wrappedValidateAjvStorage({ storage: getRxStorageDexie() }), ignoreDuplicate: true });
+    console.log('💾 [Engine] Booting v26 Isolation Build...');
+    databaseInstance = await createRxDatabase({ name: 'animaldb_v26', storage: wrappedValidateAjvStorage({ storage: getRxStorageDexie() }), ignoreDuplicate: true });
     await databaseInstance.addCollections({
       animals: { schema: { version: 0, primaryKey: 'id', type: 'object', properties: { ...baseColumns, name: { type: 'string' }, species: { type: 'string' }, category: { type: 'string' }, location: { type: 'string' }, latin_name: { type: 'string' }, entity_type: { type: 'string' }, parent_mob_id: { type: 'string' }, census_count: { type: 'number' }, hazard_rating: { type: 'string' }, is_venomous: { type: 'boolean' }, weight_unit: { type: 'string' }, dob: { type: 'string' }, is_dob_unknown: { type: 'boolean' }, sex: { type: 'string' }, microchip_id: { type: 'string' }, ring_number: { type: 'string' }, disposition_status: { type: 'string' }, archived: { type: 'boolean' } }, required: ['id', 'record_type'] } },
       admin_records: { schema: { version: 0, primaryKey: 'id', type: 'object', properties: { ...baseColumns, email: { type: 'string' }, name: { type: 'string' }, role: { type: 'string' }, initials: { type: 'string' }, permissions: { type: 'object' }, type: { type: 'string' }, value: { type: 'string' }, pin: { type: 'string' } }, required: ['id', 'record_type'] } },
@@ -53,8 +61,8 @@ export const bootDatabase = async () => {
 };
 
 export const launchSync = async (db: RxDatabase) => {
-  if (!db || !supabase) return;
-  console.log('🔄 [Engine] Launching Safe Polling...');
+  if (!db) return;
+  console.log('🔄 [Engine] Launching Safe Polling on Isolated Client...');
 
   for (const [colName, configs] of Object.entries(SYNC_MAP)) {
     const collection = db.collections[colName];
@@ -65,15 +73,20 @@ export const launchSync = async (db: RxDatabase) => {
         try {
           const state = replicateSupabase({
             collection,
-            replicationIdentifier: `safe_${colName}_${config.table}_v25`,
-            supabaseClient: supabase, // ABSOLUTELY MUST BE supabaseClient
-            table: config.table,      // ABSOLUTELY MUST BE table
+            replicationIdentifier: `isolated_${colName}_${config.table}_v26`, // Bumped identifier
+            client: isolatedSupabase, // 🚨 Now using the guaranteed private connection
+            tableName: config.table,      
             deletedField: 'is_deleted',
             pull: { batchSize: 100, modifier: (doc) => ({ ...doc, record_type: config.type }) },
-            push: { filter: (doc) => doc.record_type === config.type },
+            push: { 
+              modifier: (doc) => {
+                if (doc.record_type !== config.type) return null;
+                return doc;
+              }
+            },
             live: false
           });
-          state.error$.subscribe(err => console.error(`[Sync] ${config.table}:`, err));
+          state.error$.subscribe(err => console.error(`[Sync Error] ${config.table}:`, err));
           activeSyncStates.push(state);
         } catch (err) {
           console.error(`[Sync] Critical failure on ${config.table}:`, err);
