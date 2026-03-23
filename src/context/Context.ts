@@ -1,13 +1,12 @@
 import { createContext, useContext } from 'react';
 import { OrgProfile, User } from '../types';
-import { RxDatabase } from 'rxdb';
 
 export interface AppContextType {
-  db: RxDatabase | null;
+  db: unknown | null;
   foodOptions: string[];
   feedMethods: Record<string, string[]>;
   eventTypes: string[];
-  activeShift: unknown;
+  activeShift: any;
   clockIn: (initials: string) => Promise<void>;
   clockOut: () => Promise<void>;
   orgProfile: OrgProfile;

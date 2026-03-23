@@ -9,10 +9,10 @@ import {
   ZoomIn, ZoomOut, Utensils
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
-import { usePermissions } from '../../hooks/usePermissions';
+// import { usePermissions } from '../../hooks/usePermissions';
 import { useAppData } from '../../context/Context';
-import { useOrgSettings } from '../../features/settings/useOrgSettings';
-import GlobalBugReporter from '../ui/GlobalBugReporter';
+// import { useOrgSettings } from '../../features/settings/useOrgSettings';
+// import GlobalBugReporter from '../ui/GlobalBugReporter';
 import { useNetworkStatus } from '../../hooks/useNetworkStatus';
 import { UpdateBanner } from './UpdateBanner';
 import { InstallButton } from '../ui/InstallButton';
@@ -64,7 +64,8 @@ const SectionHeader = ({ title, isSidebarCollapsed }: { title: string, isSidebar
 
 const Layout: React.FC<LayoutProps> = () => {
   const { currentUser, logout } = useAuthStore();
-  const permissions = usePermissions();
+  // const permissions = usePermissions();
+  const permissions = {} as Record<string, boolean>;
   const { 
     view_daily_logs, view_tasks, view_medical, view_movements, 
     view_daily_rounds, view_maintenance, view_incidents, 
@@ -73,7 +74,8 @@ const Layout: React.FC<LayoutProps> = () => {
     view_settings 
   } = permissions;
   const { activeShift, clockIn, clockOut } = useAppData();
-  const { settings: orgSettings } = useOrgSettings();
+  // const { settings: orgSettings } = useOrgSettings();
+  const orgSettings = null as { logo_url?: string } | null;
   const { isOnline } = useNetworkStatus();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -352,7 +354,7 @@ const Layout: React.FC<LayoutProps> = () => {
           <Outlet context={{ isSidebarCollapsed }} />
         </div>
       </main>
-      <GlobalBugReporter />
+      {/* <GlobalBugReporter /> */}
     </div>
   );
 };

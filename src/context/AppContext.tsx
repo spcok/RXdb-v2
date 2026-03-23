@@ -1,23 +1,16 @@
-import React, { ReactNode, useEffect, useState } from 'react';
+import React, { ReactNode } from 'react';
 import { AnimalCategory, UserRole } from '../types';
 import { AppContext, AppContextType } from './Context';
-import { useTimesheetData } from '../features/staff/useTimesheetData';
-import { useAuthStore } from '../store/authStore';
-import { RxDatabase } from 'rxdb';
+// import { useTimesheetData } from '../features/staff/useTimesheetData';
+// import { useAuthStore } from '../store/authStore';
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const { clockIn, clockOut, timesheets } = useTimesheetData();
-  const { currentUser } = useAuthStore();
-  const [db, setDb] = useState<RxDatabase | null>(null);
+  // const { clockIn, clockOut, timesheets } = useTimesheetData();
+  // const { currentUser } = useAuthStore();
+  const db = null;
 
- useEffect(() => {
-    // Just get the db instance from the new safe engine
-    import("../lib/SyncEngine").then(({ databaseInstance }) => {
-      if (databaseInstance) setDb(databaseInstance);
-    });
-  }, []);
-
-  const activeShift = timesheets.find(t => t.staff_name === currentUser?.name && !t.clock_out);
+  // const activeShift = timesheets.find(t => t.staff_name === currentUser?.name && !t.clock_out);
+  const activeShift = null;
 
   const value: AppContextType = {
     db,
@@ -30,9 +23,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     },
     eventTypes: ['Training', 'Public Display', 'Medical Treatment', 'Cleaning', 'Moulting'],
     activeShift: activeShift || null,
-    clockIn: async () => await clockIn(currentUser?.name || 'Unknown'),
+    clockIn: async () => { /* await clockIn(currentUser?.name || 'Unknown') */ },
     clockOut: async () => {
-      if (activeShift) await clockOut(activeShift.id);
+      // if (activeShift) await clockOut(activeShift.id);
     },
     orgProfile: {
       name: 'Kent Owl Academy',

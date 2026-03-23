@@ -16,10 +16,9 @@
     "allowJs": true,
     "jsx": "react-jsx",
     "types": ["vite/client"],
+    "baseUrl": ".",
     "paths": {
-      "@/*": [
-        "./*"
-      ]
+      "@/*": ["./*"]
     },
     "allowImportingTsExtensions": true,
     "noEmit": true,

@@ -1,48 +1,18 @@
 import { useMemo, useState, useEffect } from 'react';
 import { useAuthStore } from '../store/authStore';
 import { UserRole, RolePermissionConfig } from '../types/index';
-import { databaseInstance as db } from '../lib/SyncEngine';
-import { supabase } from '../lib/supabase';
 
 export function usePermissions() {
   const { currentUser } = useAuthStore();
-  const [rolePermissions, setRolePermissions] = useState<RolePermissionConfig | null>(null);
+  const [rolePermissions] = useState<RolePermissionConfig | null>(null);
 
   useEffect(() => {
-    let isMounted = true;
-    
-    const fetchPermissions = async () => {
-      if (!currentUser?.role) return;
-      
-      try {
-        if (db?.admin_records) {
-          const localDoc = await db.admin_records.findOne({
-            selector: { record_type: 'role_permissions', role: currentUser.role }
-          }).exec();
-          
-          if (localDoc && isMounted) {
-            setRolePermissions(localDoc.toJSON() as RolePermissionConfig);
-            return;
-          }
-        }
-      } catch (err) {
-        console.warn('Local permissions fetch failed', err);
-      }
-
-      try {
-        const { data } = await supabase.from('role_permissions').select('*').eq('role', currentUser.role).single();
-        if (data && isMounted) setRolePermissions(data as RolePermissionConfig);
-      } catch (err) {
-        console.error('Remote permissions fetch failed', err);
-      }
-    };
-
-    fetchPermissions();
-    return () => { isMounted = false; };
+    // Mocked permissions fetch - always returns null for now
+    if (!currentUser?.role) return;
   }, [currentUser?.role]);
 
   const permissions = useMemo(() => {
-    const role = currentUser?.role || UserRole.VOLUNTEER;
+    const role = (currentUser?.role as UserRole) || UserRole.VOLUNTEER;
     const isAdminOrOwner = role === UserRole.ADMIN || role === UserRole.OWNER;
 
     if (isAdminOrOwner) {

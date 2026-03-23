@@ -1,4 +1,10 @@
-// MOCK FILE - DO NOT ADD LOGIC HERE - FOR COMPILATION ONLY
+// Mock file to satisfy imports for deleted SyncEngine and Supabase
+export const databaseInstance = null;
+export const bootDatabase = async () => null;
+export const launchSync = async () => {};
+export const stopSync = () => {};
+export const activeSyncStates = [];
+
 export const supabase = {
   from: () => ({
     select: () => ({
@@ -13,6 +19,6 @@ export const supabase = {
     onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
     getSession: () => Promise.resolve({ data: { session: null } }),
   }
-} as any;
+} as unknown;
 
 export const isSupabaseConfigured = () => false;

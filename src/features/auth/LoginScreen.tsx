@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { useAuthStore } from '../../store/authStore';
 import { Loader2, ShieldCheck, Mail, Lock, Bird, WifiOff } from 'lucide-react';
 import { motion } from 'motion/react';
-import { isSupabaseConfigured } from '../../lib/supabase';
 
 const LoginScreen: React.FC = () => {
   const { login, initialize } = useAuthStore();
@@ -10,7 +9,7 @@ const LoginScreen: React.FC = () => {
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const isConfigured = isSupabaseConfigured();
+  const isConfigured = true; // Mocked as always configured for offline mode
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
