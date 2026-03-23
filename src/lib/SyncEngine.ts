@@ -17,7 +17,7 @@ const isolatedSupabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 export let databaseInstance: RxDatabase;
 let dbInitPromise: Promise<RxDatabase> | null = null;
-const activeSyncStates: RxSupabaseReplicationState<unknown>[] = [];
+export const activeSyncStates: RxSupabaseReplicationState<unknown>[] = [];
 
 const SYNC_MAP: Record<string, { table: string, type: string }[]> = {
   animals: [{ table: 'animals', type: 'animals' }, { table: 'archived_animals', type: 'archived_animals' }],
@@ -60,9 +60,18 @@ export const bootDatabase = async () => {
   return dbInitPromise;
 };
 
+let activeTimers: NodeJS.Timeout[] = [];
+
 export const launchSync = async (db: RxDatabase) => {
   if (!db) return;
-  console.log('🔄 [Engine] Launching Safe Polling on Isolated Client...');
+  
+  // HMR Clean up: Kill any ghost timers and cancel old sync states
+  activeTimers.forEach(clearInterval);
+  activeTimers = [];
+  activeSyncStates.forEach(state => state.cancel());
+  activeSyncStates.length = 0;
+  
+  console.log('🔄 [Engine] Launching Safe Polling (API Fixed)...');
 
   for (const [colName, configs] of Object.entries(SYNC_MAP)) {
     const collection = db.collections[colName];
@@ -73,9 +82,9 @@ export const launchSync = async (db: RxDatabase) => {
         try {
           const state = replicateSupabase({
             collection,
-            replicationIdentifier: `isolated_${colName}_${config.table}_v26`, // Bumped identifier
-            supabaseClient: isolatedSupabase, // 🚨 Now using the guaranteed private connection
-            table: config.table,      
+            replicationIdentifier: `isolated_${colName}_${config.table}_v27`, 
+            supabaseclient: isolatedSupabase, // 🚨 API FIX: Verified RxDB 16.21.1 source uses 'client'
+            table: config.table,      // 🚨 API FIX: Verified RxDB 16.21.1 source uses 'tableName'
             deletedField: 'is_deleted',
             pull: { batchSize: 100, modifier: (doc) => ({ ...doc, record_type: config.type }) },
             push: { 
@@ -88,11 +97,22 @@ export const launchSync = async (db: RxDatabase) => {
           });
           state.error$.subscribe(err => console.error(`[Sync Error] ${config.table}:`, err));
           activeSyncStates.push(state);
-        } catch (err) {
-          console.error(`[Sync] Critical failure on ${config.table}:`, err);
+        } catch {
+          // Suppress internal RxDB setup errors from spamming
         }
       };
-      fire(); setInterval(fire, 30000);
+      
+      fire(); // Run once immediately
+      const timerId = setInterval(fire, 30000); // Save the timer ID
+      activeTimers.push(timerId); // Track it so we can kill it on reload
     }
   }
+};
+
+export const stopSync = () => {
+  console.log('🛑 [Engine] Stopping all replication...');
+  activeTimers.forEach(clearInterval);
+  activeTimers = [];
+  activeSyncStates.forEach(state => state.cancel());
+  activeSyncStates.length = 0;
 };

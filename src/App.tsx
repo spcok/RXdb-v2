@@ -27,13 +27,15 @@ import SafetyDrills from './features/safety/tabs/SafetyDrills';
 import SiteMaintenance from './features/safety/tabs/SiteMaintenance';
 import ReportsDashboard from './features/reports/ReportsDashboard';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import { bootDatabase as initDatabase, launchSync as startReplication } from './lib/SyncEngine';
+import { bootDatabase as initDatabase, launchSync as startReplication, stopSync } from './lib/SyncEngine';
 import { RxDatabase } from 'rxdb';
 import { isSupabaseConfigured } from './lib/supabase';
+import { useRef } from 'react';
 
 export default function App() {
   const { initialize, isLoading, session } = useAuthStore();
   const [db, setDb] = useState<RxDatabase | null>(null);
+  const isBooting = useRef(false);
   const [initError, setInitError] = useState<string | null>(null);
   const [supabaseError] = useState<string | null>(() => 
     isSupabaseConfigured() ? null : 'Supabase environment variables missing.'
@@ -48,6 +50,9 @@ export default function App() {
   };
 
   useEffect(() => {
+    if (isBooting.current) return;
+    isBooting.current = true;
+
     initDatabase()
       .then(setDb)
       .catch(err => {
@@ -56,14 +61,19 @@ export default function App() {
       });
   }, []);
 
-  // 🚨 SYNC BOOT: Clean brackets, NO return cleanup function to prevent Strict Mode from killing sync
+  // 🚨 SYNC BOOT: Clean brackets, with cleanup function to halt launchSync
   useEffect(() => {
     if (db && session && isSupabaseConfigured()) {
       console.log('🚀 [App] Conditions met. Starting replication...');
       startReplication(db);
     } else if (!session) {
       console.log('🛑 [App] No session. Sync paused.');
+      stopSync();
     }
+
+    return () => {
+      stopSync();
+    };
   }, [db, session]);
 
   useEffect(() => {
