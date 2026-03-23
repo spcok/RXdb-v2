@@ -6,6 +6,8 @@ interface AuthState {
   session: Session | null;
   currentUser: any | null; 
   isLoading: boolean;
+  isUiLocked: boolean;
+  setUiLocked: (locked: boolean) => void;
   initialize: () => Promise<void>;
   login: (email: string, password: string) => Promise<void>; // 🚨 Restored Login Function
   logout: () => Promise<void>;
@@ -15,6 +17,8 @@ export const useAuthStore = create<AuthState>((set) => ({
   session: null,
   currentUser: null,
   isLoading: true,
+  isUiLocked: false,
+  setUiLocked: (locked: boolean) => set({ isUiLocked: locked }),
 
   initialize: async () => {
     try {
@@ -67,7 +71,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   // 🚨 Restored the missing login function so the LoginScreen doesn't crash
   login: async (email, password) => {
     console.log('🔑 [Auth] Attempting Login...');
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
     // The onAuthStateChange listener will automatically catch this and update the state
   },

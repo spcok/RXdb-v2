@@ -1,17 +1,14 @@
-import { createRxDatabase, addRxPlugin, RxDatabase } from 'rxdb';
+import { createRxDatabase, RxDatabase } from 'rxdb';
 import { getRxStorageDexie } from 'rxdb/plugins/storage-dexie';
-import { RxDBDevModePlugin } from 'rxdb/plugins/dev-mode';
-import { wrappedValidateAjvStorage } from 'rxdb/plugins/validate-ajv';
 import { replicateSupabase, RxSupabaseReplicationState } from 'rxdb/plugins/replication-supabase';
 
-addRxPlugin(RxDBDevModePlugin);
-
 export let coreDB: RxDatabase;
-let bootPromise: Promise<RxDatabase> | null = null;
 const activeReplications: RxSupabaseReplicationState<unknown>[] = [];
 
 const _global = window as any;
 if (!_global.__CORE_SYNC_TIMERS__) _global.__CORE_SYNC_TIMERS__ = [];
+if (!_global.__CORE_DB_PROMISE__) _global.__CORE_DB_PROMISE__ = null;
+if (_global.__CORE_DB__) coreDB = _global.__CORE_DB__;
 
 const SYNC_MAP: Record<string, { table: string, type: string }[]> = {
   animals: [{ table: 'animals', type: 'animals' }, { table: 'archived_animals', type: 'archived_animals' }],
@@ -49,10 +46,11 @@ const listKeys = ['type', 'category', 'value'];
 const taskKeys = ['animal_id', 'title', 'due_date', 'completed', 'assigned_to', 'type', 'notes'];
 
 export const bootCoreDatabase = async () => {
-  if (bootPromise) return bootPromise;
-  bootPromise = (async () => {
-    console.log('💾 [Core DB] Booting Airtight Engine v45...');
-    coreDB = await createRxDatabase({ name: 'animaldb_core_v45', storage: wrappedValidateAjvStorage({ storage: getRxStorageDexie() }), ignoreDuplicate: true });
+  if (_global.__CORE_DB_PROMISE__) return _global.__CORE_DB_PROMISE__;
+  _global.__CORE_DB_PROMISE__ = (async () => {
+    console.log('💾 [Core DB] Booting Airtight Engine v46...');
+    coreDB = await createRxDatabase({ name: 'animaldb_core_v46', storage: getRxStorageDexie(), ignoreDuplicate: true });
+    _global.__CORE_DB__ = coreDB;
     
     await coreDB.addCollections({
       animals: { schema: { version: 0, primaryKey: 'id', type: 'object', properties: { ...baseProps, ...makeProps(animalKeys) }, required: ['id', 'record_type'] } },
@@ -70,12 +68,12 @@ export const bootCoreDatabase = async () => {
     });
     return coreDB;
   })();
-  return bootPromise;
+  return _global.__CORE_DB_PROMISE__;
 };
 
 export const startCoreSync = async (db: RxDatabase, realSupabaseClient: any) => {
   if (!db || !realSupabaseClient) return;
-  console.log('🔄 [Core DB] Engaging Authenticated Synchronization v45...');
+  console.log('🔄 [Core DB] Engaging Authenticated Synchronization v46...');
 
   _global.__CORE_SYNC_TIMERS__.forEach((t: NodeJS.Timeout) => clearInterval(t));
   _global.__CORE_SYNC_TIMERS__ = [];
@@ -91,11 +89,10 @@ export const startCoreSync = async (db: RxDatabase, realSupabaseClient: any) => 
         try {
           const state = replicateSupabase({
             collection,
-            replicationIdentifier: `core_${colName}_${config.table}_v45`,
+            replicationIdentifier: `core_${colName}_${config.table}_v46`,
             client: realSupabaseClient,
             tableName: config.table,
             deletedField: 'is_deleted',
-            updatedField: 'updated_at',
             pull: { 
               batchSize: 100, 
               modifier: (doc: any) => {
@@ -117,7 +114,9 @@ export const startCoreSync = async (db: RxDatabase, realSupabaseClient: any) => 
           });
           
           activeReplications.push(state);
-        } catch (err) {}
+        } catch (err) {
+          console.error(`[Core Sync Setup Error] ${config.table}:`, err);
+        }
       };
       
       executePull(); 
