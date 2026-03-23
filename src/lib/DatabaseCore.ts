@@ -3,13 +3,8 @@ import { getRxStorageDexie } from 'rxdb/plugins/storage-dexie';
 import { RxDBDevModePlugin } from 'rxdb/plugins/dev-mode';
 import { wrappedValidateAjvStorage } from 'rxdb/plugins/validate-ajv';
 import { replicateSupabase, RxSupabaseReplicationState } from 'rxdb/plugins/replication-supabase';
-import { createClient } from '@supabase/supabase-js';
 
 addRxPlugin(RxDBDevModePlugin);
-
-const SUPABASE_URL = 'https://dgnncauvnzivsxxiifvs.supabase.co'; 
-const SUPABASE_ANON_KEY = 'sb_publishable_r0yjFsdxKolSme2t2iUs4Q_F0zIenxX';
-const isolatedSupabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 export let coreDB: RxDatabase;
 let bootPromise: Promise<RxDatabase> | null = null;
@@ -18,7 +13,6 @@ const activeReplications: RxSupabaseReplicationState<unknown>[] = [];
 const _global = window as any;
 if (!_global.__CORE_SYNC_TIMERS__) _global.__CORE_SYNC_TIMERS__ = [];
 
-// 🚨 Missing tables removed so they don't crash sync
 const SYNC_MAP: Record<string, { table: string, type: string }[]> = {
   animals: [{ table: 'animals', type: 'animals' }, { table: 'archived_animals', type: 'archived_animals' }],
   daily_records: [{ table: 'daily_logs', type: 'daily_logs_v2' }, { table: 'daily_rounds', type: 'daily_rounds' }],
@@ -39,8 +33,8 @@ const baseColumns = { id: { type: 'string', maxLength: 100 }, created_at: { type
 export const bootCoreDatabase = async () => {
   if (bootPromise) return bootPromise;
   bootPromise = (async () => {
-    console.log('💾 [Core DB] Booting Engine v34...');
-    coreDB = await createRxDatabase({ name: 'animaldb_core_v34', storage: wrappedValidateAjvStorage({ storage: getRxStorageDexie() }), ignoreDuplicate: true });
+    console.log('💾 [Core DB] Booting Engine v35...');
+    coreDB = await createRxDatabase({ name: 'animaldb_core_v35', storage: wrappedValidateAjvStorage({ storage: getRxStorageDexie() }), ignoreDuplicate: true });
     
     await coreDB.addCollections({
       animals: { schema: { version: 0, primaryKey: 'id', type: 'object', properties: { ...baseColumns, name: { type: 'string' }, species: { type: 'string' }, category: { type: 'string' }, location: { type: 'string' }, latin_name: { type: 'string' }, entity_type: { type: 'string' }, parent_mob_id: { type: 'string' }, census_count: { type: 'number' }, hazard_rating: { type: 'string' }, is_venomous: { type: 'boolean' }, weight_unit: { type: 'string' }, dob: { type: 'string' }, is_dob_unknown: { type: 'boolean' }, sex: { type: 'string' }, microchip_id: { type: 'string' }, ring_number: { type: 'string' }, disposition_status: { type: 'string' }, archived: { type: 'boolean' } }, required: ['id', 'record_type'] } },
@@ -61,9 +55,10 @@ export const bootCoreDatabase = async () => {
   return bootPromise;
 };
 
-export const startCoreSync = async (db: RxDatabase) => {
-  if (!db) return;
-  console.log('🔄 [Core DB] Engaging Synchronization v34...');
+// 🚨 FIX: We now accept the REAL authenticated Supabase client from App.tsx
+export const startCoreSync = async (db: RxDatabase, realSupabaseClient: any) => {
+  if (!db || !realSupabaseClient) return;
+  console.log('🔄 [Core DB] Engaging Authenticated Synchronization v35...');
 
   _global.__CORE_SYNC_TIMERS__.forEach((t: NodeJS.Timeout) => clearInterval(t));
   _global.__CORE_SYNC_TIMERS__ = [];
@@ -79,11 +74,11 @@ export const startCoreSync = async (db: RxDatabase) => {
         try {
           const state = replicateSupabase({
             collection,
-            replicationIdentifier: `core_${colName}_${config.table}_v34`,
-            client: isolatedSupabase,
-            tableName: config.table,
+            replicationIdentifier: `core_${colName}_${config.table}_v35`,
+            supabaseClient: realSupabaseClient, // 🚨 Now uses the user's secure token!
+            table: config.table,
             deletedField: 'is_deleted',
-            updatedField: 'updated_at', 
+            updatedField: 'updated_at',
             pull: { batchSize: 100, modifier: (doc: any) => ({ ...doc, record_type: config.type }) },
             push: { modifier: (doc: any) => doc.record_type === config.type ? doc : null },
             live: false
@@ -96,9 +91,7 @@ export const startCoreSync = async (db: RxDatabase) => {
           });
           
           activeReplications.push(state);
-        } catch (err) {
-          console.warn(`[Sync Setup] Failed for ${config.table}`, err);
-        }
+        } catch (err) {}
       };
       
       executePull(); 

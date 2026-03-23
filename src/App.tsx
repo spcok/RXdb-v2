@@ -41,10 +41,10 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (db && session) {
-      startCoreSync(db);
-    }
-  }, [db, session]);
+  if (db && session) {
+    startCoreSync(db, supabase); // Pass the client here!
+  }
+}, [db, session]);
 
   useEffect(() => {
     let cleanup: () => void;
