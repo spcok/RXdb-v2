@@ -1,18 +1,17 @@
-// MOCK FILE - DO NOT ADD LOGIC HERE - FOR COMPILATION ONLY
-export const supabase = {
-  from: () => ({
-    select: () => ({
-      eq: () => ({
-        single: () => Promise.resolve({ data: null, error: null }),
-        order: () => Promise.resolve({ data: [], error: null }),
-      }),
-      order: () => Promise.resolve({ data: [], error: null }),
-    }),
-  }),
-  auth: {
-    onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
-    getSession: () => Promise.resolve({ data: { session: null } }),
-  }
-} as any;
+import { createClient } from '@supabase/supabase-js';
 
-export const isSupabaseConfigured = () => false;
+const SUPABASE_URL = 'https://dgnncauvnzivsxxiifvs.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_r0yjFsdxKolSme2t2iUs4Q_F0zIenxX';
+
+export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true
+  }
+});
+
+// Helper for your components to check if it's alive
+export const isSupabaseConfigured = () => {
+  return true;
+};
