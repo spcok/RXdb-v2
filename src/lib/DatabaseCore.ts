@@ -7,7 +7,6 @@ import { createClient } from '@supabase/supabase-js';
 
 addRxPlugin(RxDBDevModePlugin);
 
-// 🛡️ ISOLATED CONNECTION: Bypasses Vite circular dependency bugs
 const SUPABASE_URL = 'https://dgnncauvnzivsxxiifvs.supabase.co'; 
 const SUPABASE_ANON_KEY = 'sb_publishable_r0yjFsdxKolSme2t2iUs4Q_F0zIenxX';
 const isolatedSupabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -16,7 +15,6 @@ export let coreDB: RxDatabase;
 let bootPromise: Promise<RxDatabase> | null = null;
 const activeReplications: RxSupabaseReplicationState<unknown>[] = [];
 
-// 🛡️ GHOST KILLER: Global memory prevents HMR from leaking timers
 const _global = window as any;
 if (!_global.__CORE_SYNC_TIMERS__) _global.__CORE_SYNC_TIMERS__ = [];
 
@@ -40,8 +38,8 @@ const baseColumns = { id: { type: 'string', maxLength: 100 }, created_at: { type
 export const bootCoreDatabase = async () => {
   if (bootPromise) return bootPromise;
   bootPromise = (async () => {
-    console.log('💾 [Core DB] Booting Airtight Engine v30...');
-    coreDB = await createRxDatabase({ name: 'animaldb_core_v30', storage: wrappedValidateAjvStorage({ storage: getRxStorageDexie() }), ignoreDuplicate: true });
+    console.log('💾 [Core DB] Booting Engine v31...');
+    coreDB = await createRxDatabase({ name: 'animaldb_core_v31', storage: wrappedValidateAjvStorage({ storage: getRxStorageDexie() }), ignoreDuplicate: true });
     
     await coreDB.addCollections({
       animals: { schema: { version: 0, primaryKey: 'id', type: 'object', properties: { ...baseColumns, name: { type: 'string' }, species: { type: 'string' }, category: { type: 'string' }, location: { type: 'string' }, latin_name: { type: 'string' }, entity_type: { type: 'string' }, parent_mob_id: { type: 'string' }, census_count: { type: 'number' }, hazard_rating: { type: 'string' }, is_venomous: { type: 'boolean' }, weight_unit: { type: 'string' }, dob: { type: 'string' }, is_dob_unknown: { type: 'boolean' }, sex: { type: 'string' }, microchip_id: { type: 'string' }, ring_number: { type: 'string' }, disposition_status: { type: 'string' }, archived: { type: 'boolean' } }, required: ['id', 'record_type'] } },
@@ -64,7 +62,7 @@ export const bootCoreDatabase = async () => {
 
 export const startCoreSync = async (db: RxDatabase) => {
   if (!db) return;
-  console.log('🔄 [Core DB] Engaging Airtight Synchronization...');
+  console.log('🔄 [Core DB] Engaging Synchronization...');
 
   _global.__CORE_SYNC_TIMERS__.forEach((t: NodeJS.Timeout) => clearInterval(t));
   _global.__CORE_SYNC_TIMERS__ = [];
@@ -78,25 +76,23 @@ export const startCoreSync = async (db: RxDatabase) => {
     for (const config of configs) {
       const executePull = () => {
         try {
-          // 🛡️ OBFUSCATED CONFIG: The IDE cannot read or autocorrect this string math.
-          const strictConfig: any = {
+          const state = replicateSupabase({
             collection,
-            replicationIdentifier: `core_${colName}_${config.table}_v30`,
+            replicationIdentifier: `core_${colName}_${config.table}_v31`,
+            client: isolatedSupabase,     // The absolute correct key
+            tableName: config.table,      // The absolute correct key
             deletedField: 'is_deleted',
             pull: { batchSize: 100, modifier: (doc: any) => ({ ...doc, record_type: config.type }) },
             push: { modifier: (doc: any) => doc.record_type === config.type ? doc : null },
             live: false
-          };
+          });
           
-          strictConfig[['supa', 'base', 'Client'].join('')] = isolatedSupabase;
-          strictConfig[['ta', 'ble'].join('')] = config.table;
-
-          const state = replicateSupabase(strictConfig);
           state.error$.subscribe(err => {
              if (err?.message && !err.message.includes('Offline')) {
                  console.error(`[Core Sync Error] ${config.table}:`, err);
              }
           });
+          
           activeReplications.push(state);
         } catch (e) {}
       };

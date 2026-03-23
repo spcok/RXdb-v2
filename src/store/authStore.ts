@@ -12,10 +12,10 @@ interface AuthState {
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
-  session: { user: { id: 'mock-user-123', email: 'admin@demo.com' } }, // Fake session
+  session: { user: { id: 'mock-user-123', email: 'admin@demo.com' } }, 
   isLoading: false,
-  currentUser: { id: 'mock-user-123', email: 'admin@demo.com', name: 'Demo Admin', role: 'admin' },
-  initialize: async () => { console.log('🛡️ [Auth] Mock Auth Initialized'); },
+  currentUser: { id: 'mock-user-123', email: 'admin@demo.com', name: 'Demo Admin', role: 'admin', job_position: 'Director', pin: '1234' },
+  initialize: async () => { console.log('🛡️ [Auth] VIP Mock Auth Initialized'); },
   logout: async () => { set({ session: null, currentUser: null }); },
   login: async () => ({ error: null }),
   isUiLocked: false,
