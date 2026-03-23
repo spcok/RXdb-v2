@@ -74,8 +74,8 @@ export const launchSync = async (db: RxDatabase) => {
           const state = replicateSupabase({
             collection,
             replicationIdentifier: `isolated_${colName}_${config.table}_v26`, // Bumped identifier
-            client: isolatedSupabase, // 🚨 Now using the guaranteed private connection
-            tableName: config.table,      
+            supabaseClient: isolatedSupabase, // 🚨 Now using the guaranteed private connection
+            table: config.table,      
             deletedField: 'is_deleted',
             pull: { batchSize: 100, modifier: (doc) => ({ ...doc, record_type: config.type }) },
             push: { 
