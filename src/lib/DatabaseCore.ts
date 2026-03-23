@@ -2,7 +2,8 @@ import { createRxDatabase, RxDatabase } from 'rxdb';
 import { getRxStorageDexie } from 'rxdb/plugins/storage-dexie';
 import { replicateSupabase, RxSupabaseReplicationState } from 'rxdb/plugins/replication-supabase';
 
-export let coreDB: RxDatabase;
+const globalSandbox = globalThis as any;
+export let coreDB: RxDatabase = globalSandbox.__koa_coreDB || null;
 
 const SYNC_MAP: Record<string, { table: string, type: string }[]> = {
   animals: [{ table: 'animals', type: 'animals' }, { table: 'archived_animals', type: 'archived_animals' }],
@@ -35,69 +36,86 @@ const safetyDrillKeys = ['date', 'title', 'location', 'priority', 'status', 'des
 const listKeys = ['type', 'category', 'value'];
 const taskKeys = ['animal_id', 'title', 'due_date', 'completed', 'assigned_to', 'type', 'notes'];
 
-let bootPromise: Promise<RxDatabase> | null = null;
+export const bootCoreDatabase = (): Promise<RxDatabase> => {
+  if (globalSandbox.__koa_coreDB) {
+    if (!coreDB) coreDB = globalSandbox.__koa_coreDB;
+    return Promise.resolve(coreDB);
+  }
 
-export const bootCoreDatabase = async () => {
-  if (coreDB) return coreDB;
-  if (bootPromise) return bootPromise;
+  if (coreDB) return Promise.resolve(coreDB);
 
-  bootPromise = (async () => {
-    const attemptBoot = async (dbName: string) => {
-      const db = await createRxDatabase({ 
-        name: dbName, 
-        storage: getRxStorageDexie(), 
-        ignoreDuplicate: true 
-      });
-      
-      await db.addCollections({
-        animals: { schema: { version: 0, primaryKey: 'id', type: 'object', additionalProperties: false, properties: { ...baseProps, ...makeProps(animalKeys) }, required: ['id', 'record_type'] } },
-        admin_records: { schema: { version: 0, primaryKey: 'id', type: 'object', additionalProperties: false, properties: { ...baseProps, ...makeProps(adminKeys) }, required: ['id', 'record_type'] } },
-        daily_records: { schema: { version: 0, primaryKey: 'id', type: 'object', additionalProperties: false, properties: { ...baseProps, ...makeProps(dailyKeys) }, required: ['id', 'record_type'] } },
-        clinical_records: { schema: { version: 0, primaryKey: 'id', type: 'object', additionalProperties: false, properties: { ...baseProps, ...makeProps(clinicalKeys) }, required: ['id', 'record_type'] } },
-        logistics_records: { schema: { version: 0, primaryKey: 'id', type: 'object', additionalProperties: false, properties: { ...baseProps, ...makeProps(logisticsKeys) }, required: ['id', 'record_type'] } },
-        staff_records: { schema: { version: 0, primaryKey: 'id', type: 'object', additionalProperties: false, properties: { ...baseProps, ...makeProps(staffKeys) }, required: ['id', 'record_type'] } },
-        maintenance_logs: { schema: { version: 0, primaryKey: 'id', type: 'object', additionalProperties: false, properties: { ...baseProps, ...makeProps(maintenanceKeys) }, required: ['id', 'record_type'] } },
-        incidents: { schema: { version: 0, primaryKey: 'id', type: 'object', additionalProperties: false, properties: { ...baseProps, ...makeProps(incidentKeys) }, required: ['id', 'record_type'] } },
-        first_aid_logs: { schema: { version: 0, primaryKey: 'id', type: 'object', additionalProperties: false, properties: { ...baseProps, ...makeProps(firstAidKeys) }, required: ['id', 'record_type'] } },
-        safety_drills: { schema: { version: 0, primaryKey: 'id', type: 'object', additionalProperties: false, properties: { ...baseProps, ...makeProps(safetyDrillKeys) }, required: ['id', 'record_type'] } },
-        operational_lists: { schema: { version: 0, primaryKey: 'id', type: 'object', additionalProperties: false, properties: { ...baseProps, ...makeProps(listKeys) }, required: ['id', 'record_type'] } },
-        tasks: { schema: { version: 0, primaryKey: 'id', type: 'object', additionalProperties: false, properties: { ...baseProps, ...makeProps(taskKeys) }, required: ['id', 'record_type'] } }
-      });
+  if (globalSandbox.__koa_bootPromise) {
+    return globalSandbox.__koa_bootPromise;
+  }
+
+  const attemptBoot = async (dbName: string) => {
+    const db = await createRxDatabase({ 
+      name: dbName, 
+      storage: getRxStorageDexie(), 
+      ignoreDuplicate: true // Crucial for dev environments
+    });
+    
+    await db.addCollections({
+      animals: { schema: { version: 0, primaryKey: 'id', type: 'object', additionalProperties: false, properties: { ...baseProps, ...makeProps(animalKeys) }, required: ['id', 'record_type'] } },
+      admin_records: { schema: { version: 0, primaryKey: 'id', type: 'object', additionalProperties: false, properties: { ...baseProps, ...makeProps(adminKeys) }, required: ['id', 'record_type'] } },
+      daily_records: { schema: { version: 0, primaryKey: 'id', type: 'object', additionalProperties: false, properties: { ...baseProps, ...makeProps(dailyKeys) }, required: ['id', 'record_type'] } },
+      clinical_records: { schema: { version: 0, primaryKey: 'id', type: 'object', additionalProperties: false, properties: { ...baseProps, ...makeProps(clinicalKeys) }, required: ['id', 'record_type'] } },
+      logistics_records: { schema: { version: 0, primaryKey: 'id', type: 'object', additionalProperties: false, properties: { ...baseProps, ...makeProps(logisticsKeys) }, required: ['id', 'record_type'] } },
+      staff_records: { schema: { version: 0, primaryKey: 'id', type: 'object', additionalProperties: false, properties: { ...baseProps, ...makeProps(staffKeys) }, required: ['id', 'record_type'] } },
+      maintenance_logs: { schema: { version: 0, primaryKey: 'id', type: 'object', additionalProperties: false, properties: { ...baseProps, ...makeProps(maintenanceKeys) }, required: ['id', 'record_type'] } },
+      incidents: { schema: { version: 0, primaryKey: 'id', type: 'object', additionalProperties: false, properties: { ...baseProps, ...makeProps(incidentKeys) }, required: ['id', 'record_type'] } },
+      first_aid_logs: { schema: { version: 0, primaryKey: 'id', type: 'object', additionalProperties: false, properties: { ...baseProps, ...makeProps(firstAidKeys) }, required: ['id', 'record_type'] } },
+      safety_drills: { schema: { version: 0, primaryKey: 'id', type: 'object', additionalProperties: false, properties: { ...baseProps, ...makeProps(safetyDrillKeys) }, required: ['id', 'record_type'] } },
+      operational_lists: { schema: { version: 0, primaryKey: 'id', type: 'object', additionalProperties: false, properties: { ...baseProps, ...makeProps(listKeys) }, required: ['id', 'record_type'] } },
+      tasks: { schema: { version: 0, primaryKey: 'id', type: 'object', additionalProperties: false, properties: { ...baseProps, ...makeProps(taskKeys) }, required: ['id', 'record_type'] } }
+    });
+    return db;
+  };
+
+  console.log('🛡️ [Core DB] Booting Airtight Engine v55 (HMR Protected)...');
+
+  // Attach the promise, but clear it immediately if it fails
+  globalSandbox.__koa_bootPromise = attemptBoot('animaldb_core_v55')
+    .then(db => {
+      coreDB = db;
+      globalSandbox.__koa_coreDB = db;
       return db;
-    };
-
-    console.log('🛡️ [Core DB] Booting Airtight Engine v53...');
-
-    try {
-      coreDB = await attemptBoot('animaldb_core_v53');
-      return coreDB;
-    } catch (e: any) {
-      if (e.message && e.message.includes('DB9')) {
-        console.warn('⚠️ Zombie DB9 detected in Sandbox! Mutating database name to bypass lock...');
-        const uniqueName = 'animaldb_core_v53_' + Date.now();
-        coreDB = await attemptBoot(uniqueName);
-        return coreDB;
+    })
+    .catch(async (e) => {
+      console.warn('⚠️ Primary boot failed. Attempting deep reset...', e.message);
+      globalSandbox.__koa_bootPromise = null; // Clear the ghost promise!
+      
+      const fallbackName = 'animaldb_core_v55_' + Date.now();
+      try {
+        const fallbackDb = await attemptBoot(fallbackName);
+        coreDB = fallbackDb;
+        globalSandbox.__koa_coreDB = fallbackDb;
+        return fallbackDb;
+      } catch (fallbackError) {
+        throw fallbackError;
       }
-      throw e;
-    }
-  })();
+    });
 
-  return bootPromise;
+  return globalSandbox.__koa_bootPromise;
 };
 
 export const destroyCoreDatabase = async () => {
   if (coreDB) {
     await (coreDB as any).destroy();
-    bootPromise = null;
+    globalSandbox.__koa_coreDB = null;
+    globalSandbox.__koa_bootPromise = null;
   }
 };
 
-const activeReplications: RxSupabaseReplicationState<unknown>[] = [];
+if (!globalSandbox.__koa_activeReplications) {
+    globalSandbox.__koa_activeReplications = [];
+}
+const activeReplications: RxSupabaseReplicationState<unknown>[] = globalSandbox.__koa_activeReplications;
 
 export const startCoreSync = async (db: RxDatabase, realSupabaseClient: any) => {
   if (!db || !realSupabaseClient) return;
 
-  console.log('🔗 [Core DB] Engaging Official Authenticated Sync v53...');
+  console.log('🔗 [Core DB] Engaging Official Authenticated Sync v55...');
 
   activeReplications.forEach(state => state.cancel());
   activeReplications.length = 0;
@@ -110,7 +128,7 @@ export const startCoreSync = async (db: RxDatabase, realSupabaseClient: any) => 
       try {
         const state = replicateSupabase({
           collection,
-          replicationIdentifier: `core_${colName}_${config.table}_v53`,
+          replicationIdentifier: `core_${colName}_${config.table}_v55`,
           client: realSupabaseClient,
           tableName: config.table,
           deletedField: 'is_deleted',
@@ -119,11 +137,8 @@ export const startCoreSync = async (db: RxDatabase, realSupabaseClient: any) => 
             modifier: (doc: any) => {
               const cleanDoc = { ...doc };
               Object.keys(cleanDoc).forEach(key => {
-                if (cleanDoc[key] === null) {
-                  delete cleanDoc[key];
-                }
+                if (cleanDoc[key] === null) delete cleanDoc[key];
               });
-
               if (!cleanDoc.id) cleanDoc.id = cleanDoc.role || cleanDoc.name || cleanDoc.type || String(Date.now() + Math.random());
               return { ...cleanDoc, id: String(cleanDoc.id), record_type: config.type };
             } 
@@ -148,3 +163,20 @@ export const startCoreSync = async (db: RxDatabase, realSupabaseClient: any) => 
     }
   }
 };
+
+// 🔥 VITE HMR CLEANUP HOOK
+// This tells Vite to gracefully destroy the database connection BEFORE reloading the page
+// @ts-ignore
+if (import.meta.hot) {
+  // @ts-ignore
+  import.meta.hot.dispose(() => {
+    console.log('🧹 [Vite HMR] Cleaning up IndexedDB connections...');
+    if (coreDB) {
+      coreDB.destroy();
+    }
+    activeReplications.forEach(state => state.cancel());
+    globalSandbox.__koa_coreDB = null;
+    globalSandbox.__koa_bootPromise = null;
+    globalSandbox.__koa_activeReplications = [];
+  });
+}
