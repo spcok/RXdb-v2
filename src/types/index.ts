@@ -66,7 +66,8 @@ export enum UserRole {
   KEEPER = 'KEEPER',
   SENIOR_KEEPER = 'SENIOR_KEEPER',
   ADMIN = 'ADMIN',
-  OWNER = 'OWNER'
+  OWNER = 'OWNER',
+  GUEST = 'GUEST'
 }
 
 export enum HealthRecordType {
