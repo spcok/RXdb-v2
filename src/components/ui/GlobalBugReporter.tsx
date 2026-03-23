@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { MessageSquareWarning, X, Send, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { useAuthStore } from '../../store/authStore';
-import { databaseInstance as db } from '../../lib/SyncEngine';
+import { coreDB as db } from '../../lib/DatabaseCore';
 
 const GlobalBugReporter: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);

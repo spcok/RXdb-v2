@@ -5,7 +5,7 @@ import {
   CheckCircle2, Info,
   Download, Trash2, ShieldX
 } from 'lucide-react';
-import { databaseInstance as db } from '../../../lib/SyncEngine';
+import { coreDB as db } from '../../../lib/DatabaseCore';
 import { removeRxDatabase } from 'rxdb';
 import { getRxStorageDexie } from 'rxdb/plugins/storage-dexie';
 

@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { AnimalCategory, DailyRound, Animal, LogType, LogEntry, EntityType } from '../../types';
-import { databaseInstance as db } from '../../lib/SyncEngine';
+import { coreDB as db } from '../../lib/DatabaseCore';
 import { v4 as uuidv4 } from 'uuid';
 
 interface AnimalCheckState {

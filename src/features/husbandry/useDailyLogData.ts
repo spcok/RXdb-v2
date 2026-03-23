@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState, useEffect } from 'react';
 import { LogEntry, LogType } from '../../types';
-import { databaseInstance as db } from '../../lib/SyncEngine';
+import { coreDB as db } from '../../lib/DatabaseCore';
 import { useAnimalsData } from '../animals/useAnimalsData';
 
 export const useDailyLogData = (viewDate: string, activeCategory: string) => {

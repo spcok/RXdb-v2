@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { databaseInstance as db } from '../lib/SyncEngine';
+import { coreDB as db } from '../lib/DatabaseCore';
 import { 
   Animal, 
   AnimalCategory, 

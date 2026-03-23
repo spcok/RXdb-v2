@@ -14,7 +14,7 @@ import {
   Wrench
 } from 'lucide-react';
 import { renderAsync } from 'docx-preview';
-import { databaseInstance as db } from '../../lib/SyncEngine';
+import { coreDB as db } from '../../lib/DatabaseCore';
 import { Animal, UserRole, Shift, ClinicalNote, MARChart, InternalMovement, ExternalTransfer, MaintenanceLog } from '../../types';
 import { generateDailyLogDocx, generateInternalMovementsDocx, generateExternalTransfersDocx, generateSiteMaintenanceDocx, generateAnimalCensusDocx, generateSection9Docx, generateDeathCertificateDocx, generateStaffRotaDocx, generateInspectionPackage } from './utils/docxExportService';
 import { useAuthStore } from '../../store/authStore';

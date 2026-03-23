@@ -1,13 +1,14 @@
 import React, { ReactNode } from 'react';
 import { AnimalCategory, UserRole } from '../types';
 import { AppContext, AppContextType } from './Context';
+import { coreDB } from '../lib/DatabaseCore';
 // import { useTimesheetData } from '../features/staff/useTimesheetData';
 // import { useAuthStore } from '../store/authStore';
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   // const { clockIn, clockOut, timesheets } = useTimesheetData();
   // const { currentUser } = useAuthStore();
-  const db = null;
+  const db = coreDB;
 
   // const activeShift = timesheets.find(t => t.staff_name === currentUser?.name && !t.clock_out);
   const activeShift = null;

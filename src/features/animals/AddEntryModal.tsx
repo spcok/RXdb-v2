@@ -2,7 +2,7 @@ import React from 'react';
 import { Animal, LogType, LogEntry, ClinicalNote } from '../../types';
 import HusbandryEntryModal from '../husbandry/AddEntryModal';
 import { AddClinicalNoteModal } from '../medical/AddClinicalNoteModal';
-import { databaseInstance as db } from '../../lib/SyncEngine';
+import { coreDB as db } from '../../lib/DatabaseCore';
 
 interface AddEntryModalProps {
   isOpen: boolean;

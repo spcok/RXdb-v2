@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { databaseInstance as rxdb } from '../../lib/SyncEngine';
+import { coreDB as rxdb } from '../../lib/DatabaseCore';
 import { supabase } from '../../lib/supabase';
 
 export function useSystemHealthData() {

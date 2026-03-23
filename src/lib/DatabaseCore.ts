@@ -18,11 +18,12 @@ const activeReplications: RxSupabaseReplicationState<unknown>[] = [];
 const _global = window as any;
 if (!_global.__CORE_SYNC_TIMERS__) _global.__CORE_SYNC_TIMERS__ = [];
 
+// 🚨 Missing tables removed so they don't crash sync
 const SYNC_MAP: Record<string, { table: string, type: string }[]> = {
   animals: [{ table: 'animals', type: 'animals' }, { table: 'archived_animals', type: 'archived_animals' }],
   daily_records: [{ table: 'daily_logs', type: 'daily_logs_v2' }, { table: 'daily_rounds', type: 'daily_rounds' }],
-  clinical_records: [{ table: 'medical_logs', type: 'medical_logs' }, { table: 'mar_charts', type: 'mar_charts' }, { table: 'quarantine_records', type: 'quarantine_records' }, { table: 'clinical_note', type: 'clinical_note' }],
-  logistics_records: [{ table: 'internal_movements', type: 'internal_movements' }, { table: 'external_transfers', type: 'external_transfers' }, { table: 'movements', type: 'movements' }, { table: 'transfers', type: 'transfers' }],
+  clinical_records: [{ table: 'medical_logs', type: 'medical_logs' }, { table: 'mar_charts', type: 'mar_charts' }, { table: 'quarantine_records', type: 'quarantine_records' }],
+  logistics_records: [{ table: 'internal_movements', type: 'internal_movements' }, { table: 'external_transfers', type: 'external_transfers' }],
   staff_records: [{ table: 'shifts', type: 'shifts' }, { table: 'holidays', type: 'holidays' }, { table: 'timesheets', type: 'timesheets' }],
   maintenance_logs: [{ table: 'maintenance_logs', type: 'maintenance_logs' }],
   incidents: [{ table: 'incidents', type: 'incidents' }],
@@ -38,8 +39,8 @@ const baseColumns = { id: { type: 'string', maxLength: 100 }, created_at: { type
 export const bootCoreDatabase = async () => {
   if (bootPromise) return bootPromise;
   bootPromise = (async () => {
-    console.log('💾 [Core DB] Booting Engine v31...');
-    coreDB = await createRxDatabase({ name: 'animaldb_core_v31', storage: wrappedValidateAjvStorage({ storage: getRxStorageDexie() }), ignoreDuplicate: true });
+    console.log('💾 [Core DB] Booting Engine v34...');
+    coreDB = await createRxDatabase({ name: 'animaldb_core_v34', storage: wrappedValidateAjvStorage({ storage: getRxStorageDexie() }), ignoreDuplicate: true });
     
     await coreDB.addCollections({
       animals: { schema: { version: 0, primaryKey: 'id', type: 'object', properties: { ...baseColumns, name: { type: 'string' }, species: { type: 'string' }, category: { type: 'string' }, location: { type: 'string' }, latin_name: { type: 'string' }, entity_type: { type: 'string' }, parent_mob_id: { type: 'string' }, census_count: { type: 'number' }, hazard_rating: { type: 'string' }, is_venomous: { type: 'boolean' }, weight_unit: { type: 'string' }, dob: { type: 'string' }, is_dob_unknown: { type: 'boolean' }, sex: { type: 'string' }, microchip_id: { type: 'string' }, ring_number: { type: 'string' }, disposition_status: { type: 'string' }, archived: { type: 'boolean' } }, required: ['id', 'record_type'] } },
@@ -62,7 +63,7 @@ export const bootCoreDatabase = async () => {
 
 export const startCoreSync = async (db: RxDatabase) => {
   if (!db) return;
-  console.log('🔄 [Core DB] Engaging Synchronization...');
+  console.log('🔄 [Core DB] Engaging Synchronization v34...');
 
   _global.__CORE_SYNC_TIMERS__.forEach((t: NodeJS.Timeout) => clearInterval(t));
   _global.__CORE_SYNC_TIMERS__ = [];
@@ -78,10 +79,11 @@ export const startCoreSync = async (db: RxDatabase) => {
         try {
           const state = replicateSupabase({
             collection,
-            replicationIdentifier: `core_${colName}_${config.table}_v31`,
-            client: isolatedSupabase,     // The absolute correct key
-            tableName: config.table,      // The absolute correct key
+            replicationIdentifier: `core_${colName}_${config.table}_v34`,
+            client: isolatedSupabase,
+            tableName: config.table,
             deletedField: 'is_deleted',
+            updatedField: 'updated_at', 
             pull: { batchSize: 100, modifier: (doc: any) => ({ ...doc, record_type: config.type }) },
             push: { modifier: (doc: any) => doc.record_type === config.type ? doc : null },
             live: false
@@ -94,7 +96,9 @@ export const startCoreSync = async (db: RxDatabase) => {
           });
           
           activeReplications.push(state);
-        } catch (e) {}
+        } catch (err) {
+          console.warn(`[Sync Setup] Failed for ${config.table}`, err);
+        }
       };
       
       executePull(); 

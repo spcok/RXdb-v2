@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Animal } from '../../types';
-import { databaseInstance as db } from '../../lib/SyncEngine';
+import { coreDB as db } from '../../lib/DatabaseCore';
 
 export function useAnimalsData() {
   const [animals, setAnimals] = useState<Animal[]>([]);

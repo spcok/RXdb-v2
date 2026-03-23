@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Animal, AnimalCategory, LogType, LogEntry } from '../../types';
-import { databaseInstance as db } from '../../lib/SyncEngine';
+import { coreDB as db } from '../../lib/DatabaseCore';
 import { useTaskData } from '../husbandry/useTaskData';
 
 export interface EnhancedAnimal extends Animal {

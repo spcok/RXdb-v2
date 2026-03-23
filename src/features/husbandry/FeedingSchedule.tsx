@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { Animal, AnimalCategory, Task, LogType, OperationalList } from '../../types';
 import { CalendarClock, Plus, Calendar, Trash2, Filter, Utensils, RefreshCw, Loader2, History, ArrowRight, Copy } from 'lucide-react';
 import { useFeedingScheduleData } from './useFeedingScheduleData';
-import { databaseInstance as db } from '../../lib/SyncEngine';
+import { coreDB as db } from '../../lib/DatabaseCore';
 
 const FeedingSchedule: React.FC = () => {
   const { animals, tasks, addTasks, deleteTask, isLoading } = useFeedingScheduleData();

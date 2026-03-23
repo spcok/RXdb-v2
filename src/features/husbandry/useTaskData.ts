@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { databaseInstance as db } from '../../lib/SyncEngine';
+import { coreDB as db } from '../../lib/DatabaseCore';
 import { Task, User, UserRole, Animal } from '../../types';
 
 const mockUsers: User[] = [

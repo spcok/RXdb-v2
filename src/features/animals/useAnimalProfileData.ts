@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { databaseInstance as db } from '../../lib/SyncEngine';
+import { coreDB as db } from '../../lib/DatabaseCore';
 import { Animal, LogEntry, Task } from '../../types';
 
 export function useAnimalProfileData(animalId: string) {
