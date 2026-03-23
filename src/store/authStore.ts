@@ -1,12 +1,13 @@
 import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
-import { Session, User } from '@supabase/supabase-js';
+import { Session } from '@supabase/supabase-js';
 
 interface AuthState {
   session: Session | null;
-  currentUser: any | null; // Holds the extended user profile (role, pin, etc.)
+  currentUser: any | null; 
   isLoading: boolean;
   initialize: () => Promise<void>;
+  login: (email: string, password: string) => Promise<void>; // 🚨 Restored Login Function
   logout: () => Promise<void>;
 }
 
@@ -19,13 +20,11 @@ export const useAuthStore = create<AuthState>((set) => ({
     try {
       console.log('🛡️ [Auth] Initializing Real Supabase Auth...');
       
-      // 1. Get the current active session
       const { data: { session }, error } = await supabase.auth.getSession();
       
       if (error) throw error;
 
       if (session) {
-        // 2. Fetch the user's extended profile (roles, permissions, pin)
         const { data: profile } = await supabase
           .from('users')
           .select('*')
@@ -41,7 +40,6 @@ export const useAuthStore = create<AuthState>((set) => ({
         set({ session: null, currentUser: null, isLoading: false });
       }
 
-      // 3. Listen for future login/logout events
       supabase.auth.onAuthStateChange(async (_event, newSession) => {
         if (newSession) {
           const { data: profile } = await supabase
@@ -64,6 +62,14 @@ export const useAuthStore = create<AuthState>((set) => ({
       console.error('❌ [Auth Error] Failed to initialize session:', error);
       set({ session: null, currentUser: null, isLoading: false });
     }
+  },
+
+  // 🚨 Restored the missing login function so the LoginScreen doesn't crash
+  login: async (email, password) => {
+    console.log('🔑 [Auth] Attempting Login...');
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    // The onAuthStateChange listener will automatically catch this and update the state
   },
 
   logout: async () => {

@@ -33,15 +33,13 @@ const baseColumns = { id: { type: 'string', maxLength: 100 }, created_at: { type
 export const bootCoreDatabase = async () => {
   if (bootPromise) return bootPromise;
   bootPromise = (async () => {
-    console.log('💾 [Core DB] Booting Engine v35...');
-    coreDB = await createRxDatabase({ name: 'animaldb_core_v35', storage: wrappedValidateAjvStorage({ storage: getRxStorageDexie() }), ignoreDuplicate: true });
+    console.log('💾 [Core DB] Booting Engine v37...');
+    coreDB = await createRxDatabase({ name: 'animaldb_core_v37', storage: wrappedValidateAjvStorage({ storage: getRxStorageDexie() }), ignoreDuplicate: true });
     
     await coreDB.addCollections({
       animals: { schema: { version: 0, primaryKey: 'id', type: 'object', properties: { ...baseColumns, name: { type: 'string' }, species: { type: 'string' }, category: { type: 'string' }, location: { type: 'string' }, latin_name: { type: 'string' }, entity_type: { type: 'string' }, parent_mob_id: { type: 'string' }, census_count: { type: 'number' }, hazard_rating: { type: 'string' }, is_venomous: { type: 'boolean' }, weight_unit: { type: 'string' }, dob: { type: 'string' }, is_dob_unknown: { type: 'boolean' }, sex: { type: 'string' }, microchip_id: { type: 'string' }, ring_number: { type: 'string' }, disposition_status: { type: 'string' }, archived: { type: 'boolean' } }, required: ['id', 'record_type'] } },
       admin_records: { schema: { version: 0, primaryKey: 'id', type: 'object', properties: { ...baseColumns, email: { type: 'string' }, name: { type: 'string' }, role: { type: 'string' }, initials: { type: 'string' }, permissions: { type: 'object' }, type: { type: 'string' }, value: { type: 'string' }, pin: { type: 'string' } }, required: ['id', 'record_type'] } },
-      daily_records: { schema: { version: 0, primaryKey: 'id', type: 'object', properties: { ...baseColumns, animal_id: { type: 'string' }, log_type: { type: 'string' }, log_date: { type: 'string' }, value: { type: 'string' }, notes: { type: 'string' }, user_initials: { type: 'string' }, weight_grams: { type: 'number' }, weight: { type: 'number' }, weight_unit: { type: 'string' }, health_record_type: { type: 'string' }, shift: { type: 'string' }, section: { type: 'string' }, completed_by: { type: 'string' }, temperature_c: { type: 'number' } }, required: ['id', 'record_type'] } },
-      clinical_records: { schema: { version: 0, primaryKey: 'id', type: 'object', properties: { ...baseColumns, animal_id: { type: 'string' }, animal_name: { type: 'string' }, date: { type: 'string' }, note_type: { type: 'string' }, note_text: { type: 'string' }, staff_initials: { type: 'string' }, medication: { type: 'string' }, dosage: { type: 'string' }, frequency: { type: 'string' }, status: { type: 'string' }, start_date: { type: 'string' }, end_date: { type: 'string' }, reason: { type: 'string' }, bcs: { type: 'number' }, weight: { type: 'number' }, isolation_notes: { type: 'string' } }, required: ['id', 'record_type'] } },
-      logistics_records: { schema: { version: 0, primaryKey: 'id', type: 'object', properties: { ...baseColumns, animal_id: { type: 'string' }, animal_name: { type: 'string' }, log_date: { type: 'string' }, date: { type: 'string' }, movement_type: { type: 'string' }, transfer_type: { type: 'string' }, source_location: { type: 'string' }, destination_location: { type: 'string' }, institution: { type: 'string' }, status: { type: 'string' }, created_by: { type: 'string' } }, required: ['id', 'record_type'] } },
+      daily_records: { schema: { version: 0, primaryKey: 'id', type: 'object', properties: { ...baseColumns, animal_id: { type: 'string' }, log_type: { type: 'string' }, log_date: { type: 'string' }, value: { type: 'string' }, notes: { type: 'string' }, user_initials: { type: 'string' }, weight_grams: { type: 'number' }, weight: { type: 'number' }, weight_unit: { type: 'string' }, health_record_type: { type: 'string' }, shift: { type: 'string' }, section: { type: 'string' }, completed_by: { type: 'string' }, temperature_c: { type: 'number' }, basking_temp_c: { type: 'number' }, cool_temp_c: { type: 'number' }, created_by: { type: 'string' }, integrity_seal: { type: 'string' } }, required: ['id', 'record_type'] } },      clinical_records: { schema: { version: 0, primaryKey: 'id', type: 'object', properties: { ...baseColumns, animal_id: { type: 'string' }, animal_name: { type: 'string' }, date: { type: 'string' }, note_type: { type: 'string' }, note_text: { type: 'string' }, staff_initials: { type: 'string' }, medication: { type: 'string' }, dosage: { type: 'string' }, frequency: { type: 'string' }, status: { type: 'string' }, start_date: { type: 'string' }, end_date: { type: 'string' }, reason: { type: 'string' }, bcs: { type: 'number' }, weight: { type: 'number' }, isolation_notes: { type: 'string' } }, required: ['id', 'record_type'] } },
       staff_records: { schema: { version: 0, primaryKey: 'id', type: 'object', properties: { ...baseColumns, user_id: { type: 'string' }, staff_name: { type: 'string' }, date: { type: 'string' }, start_date: { type: 'string' }, end_date: { type: 'string' }, clock_in: { type: 'string' }, clock_out: { type: 'string' }, status: { type: 'string' }, shift_type: { type: 'string' }, leave_type: { type: 'string' } }, required: ['id', 'record_type'] } },
       maintenance_logs: { schema: { version: 0, primaryKey: 'id', type: 'object', properties: { ...baseColumns, enclosure_id: { type: 'string' }, task_type: { type: 'string' }, description: { type: 'string' }, status: { type: 'string' }, date_logged: { type: 'string' }, date_completed: { type: 'string' } }, required: ['id', 'record_type'] } },
       incidents: { schema: { version: 0, primaryKey: 'id', type: 'object', properties: { ...baseColumns, date: { type: 'string' }, time: { type: 'string' }, type: { type: 'string' }, severity: { type: 'string' }, description: { type: 'string' }, location: { type: 'string' }, status: { type: 'string' }, reported_by: { type: 'string' } }, required: ['id', 'record_type'] } },
@@ -55,10 +53,9 @@ export const bootCoreDatabase = async () => {
   return bootPromise;
 };
 
-// 🚨 FIX: We now accept the REAL authenticated Supabase client from App.tsx
 export const startCoreSync = async (db: RxDatabase, realSupabaseClient: any) => {
   if (!db || !realSupabaseClient) return;
-  console.log('🔄 [Core DB] Engaging Authenticated Synchronization v35...');
+  console.log('🔄 [Core DB] Engaging Authenticated Synchronization v37...');
 
   _global.__CORE_SYNC_TIMERS__.forEach((t: NodeJS.Timeout) => clearInterval(t));
   _global.__CORE_SYNC_TIMERS__ = [];
@@ -74,11 +71,11 @@ export const startCoreSync = async (db: RxDatabase, realSupabaseClient: any) => 
         try {
           const state = replicateSupabase({
             collection,
-            replicationIdentifier: `core_${colName}_${config.table}_v35`,
-            supabaseClient: realSupabaseClient, // 🚨 Now uses the user's secure token!
-            table: config.table,
+            replicationIdentifier: `core_${colName}_${config.table}_v37`,
+            client: realSupabaseClient,     // 🚨 FIXED: Correct Key for Auth Token
+            tableName: config.table,        // 🚨 FIXED: Correct Key
             deletedField: 'is_deleted',
-            updatedField: 'updated_at',
+            updatedField: 'updated_at',     // 🚨 FIXED: Overrides _modified
             pull: { batchSize: 100, modifier: (doc: any) => ({ ...doc, record_type: config.type }) },
             push: { modifier: (doc: any) => doc.record_type === config.type ? doc : null },
             live: false

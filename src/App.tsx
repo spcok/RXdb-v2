@@ -1,11 +1,21 @@
 import { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { RxDatabase } from 'rxdb';
+
+// --- Core Architecture ---
 import Layout from './components/layout/Layout';
 import { AppProvider } from './context/AppContext';
 import { useAuthStore } from './store/authStore';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { bootCoreDatabase, startCoreSync } from './lib/DatabaseCore';
+import { supabase } from './lib/supabase'; // 🚨 The missing piece is here!
+import { useInactivityTimer } from './hooks/useInactivityTimer';
+
+// --- Auth Screens ---
 import LoginScreen from './features/auth/LoginScreen';
 import LockScreen from './features/auth/LockScreen';
-import { useInactivityTimer } from './hooks/useInactivityTimer';
+
+// --- Feature Screens ---
 import DashboardContainer from './features/dashboard/DashboardContainer';
 import WeatherView from './features/dashboard/WeatherView';
 import Tasks from './features/husbandry/Tasks';
@@ -26,9 +36,6 @@ import FirstAidLog from './features/safety/tabs/FirstAid';
 import SafetyDrills from './features/safety/tabs/SafetyDrills';
 import SiteMaintenance from './features/safety/tabs/SiteMaintenance';
 import ReportsDashboard from './features/reports/ReportsDashboard';
-import { ErrorBoundary } from './components/ErrorBoundary';
-import { bootCoreDatabase, startCoreSync } from './lib/DatabaseCore';
-import { RxDatabase } from 'rxdb';
 
 export default function App() {
   const { initialize, isLoading, session } = useAuthStore();
@@ -36,16 +43,7 @@ export default function App() {
   
   useInactivityTimer();
 
-  useEffect(() => {
-    bootCoreDatabase().then(setDb).catch(console.error);
-  }, []);
-
-  useEffect(() => {
-  if (db && session) {
-    startCoreSync(db, supabase); // Pass the client here!
-  }
-}, [db, session]);
-
+  // 1. Initialize Real Authentication
   useEffect(() => {
     let cleanup: () => void;
     initialize().then((c: any) => {
@@ -54,6 +52,19 @@ export default function App() {
     return () => { if (cleanup) cleanup(); };
   }, [initialize]);
 
+  // 2. Boot the Offline-First Database Engine
+  useEffect(() => {
+    bootCoreDatabase().then(setDb).catch(console.error);
+  }, []);
+
+  // 3. Launch Authenticated Sync (Hands the Supabase Token to the Engine)
+  useEffect(() => {
+    if (db && session) {
+      startCoreSync(db, supabase);
+    }
+  }, [db, session]);
+
+  // 🛡️ Guard 1: System Booting Screen
   if (isLoading || !db) {
     return (
       <div className="h-screen w-screen flex items-center justify-center bg-slate-950">
@@ -65,8 +76,10 @@ export default function App() {
     );
   }
 
+  // 🛡️ Guard 2: Not Logged In
   if (!session) return <LoginScreen />;
 
+  // 🟢 System Ready: Render Application
   return (
     <ErrorBoundary>
       <AppProvider>
