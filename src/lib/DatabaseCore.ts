@@ -2,10 +2,7 @@ import { createRxDatabase, RxDatabase } from 'rxdb';
 import { getRxStorageDexie } from 'rxdb/plugins/storage-dexie';
 import { replicateSupabase, RxSupabaseReplicationState } from 'rxdb/plugins/replication-supabase';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const _window = window as any;
-export let coreDB: RxDatabase = _window.__RXDB_INSTANCE__ || null;
-let bootPromise: Promise<RxDatabase> | null = _window.__RXDB_PROMISE__ || null;
+export let coreDB: RxDatabase;
 
 const SYNC_MAP: Record<string, { table: string, type: string }[]> = {
   animals: [{ table: 'animals', type: 'animals' }, { table: 'archived_animals', type: 'archived_animals' }],
@@ -38,70 +35,66 @@ const safetyDrillKeys = ['date', 'title', 'location', 'priority', 'status', 'des
 const listKeys = ['type', 'category', 'value'];
 const taskKeys = ['animal_id', 'title', 'due_date', 'completed', 'assigned_to', 'type', 'notes'];
 
+let bootPromise: Promise<RxDatabase> | null = null;
+
 export const bootCoreDatabase = async () => {
   if (coreDB) return coreDB;
   if (bootPromise) return bootPromise;
 
-  console.log('💾 [Core DB] Booting Airtight Engine v51 (Vite-Safe)...');
-
   bootPromise = (async () => {
-    try {
+    // Helper function to build the database
+    const attemptBoot = async (dbName: string) => {
       const db = await createRxDatabase({ 
-        name: 'animaldb_core_v51', 
+        name: dbName, 
         storage: getRxStorageDexie(), 
         ignoreDuplicate: true 
       });
       
       await db.addCollections({
-      animals: { schema: { version: 0, primaryKey: 'id', type: 'object', properties: { ...baseProps, ...makeProps(animalKeys) }, required: ['id', 'record_type'] } },
-      admin_records: { schema: { version: 0, primaryKey: 'id', type: 'object', properties: { ...baseProps, ...makeProps(adminKeys) }, required: ['id', 'record_type'] } },
-      daily_records: { schema: { version: 0, primaryKey: 'id', type: 'object', properties: { ...baseProps, ...makeProps(dailyKeys) }, required: ['id', 'record_type'] } },
-      clinical_records: { schema: { version: 0, primaryKey: 'id', type: 'object', properties: { ...baseProps, ...makeProps(clinicalKeys) }, required: ['id', 'record_type'] } },
-      logistics_records: { schema: { version: 0, primaryKey: 'id', type: 'object', properties: { ...baseProps, ...makeProps(logisticsKeys) }, required: ['id', 'record_type'] } },
-      staff_records: { schema: { version: 0, primaryKey: 'id', type: 'object', properties: { ...baseProps, ...makeProps(staffKeys) }, required: ['id', 'record_type'] } },
-      maintenance_logs: { schema: { version: 0, primaryKey: 'id', type: 'object', properties: { ...baseProps, ...makeProps(maintenanceKeys) }, required: ['id', 'record_type'] } },
-      incidents: { schema: { version: 0, primaryKey: 'id', type: 'object', properties: { ...baseProps, ...makeProps(incidentKeys) }, required: ['id', 'record_type'] } },
-      first_aid_logs: { schema: { version: 0, primaryKey: 'id', type: 'object', properties: { ...baseProps, ...makeProps(firstAidKeys) }, required: ['id', 'record_type'] } },
-      safety_drills: { schema: { version: 0, primaryKey: 'id', type: 'object', properties: { ...baseProps, ...makeProps(safetyDrillKeys) }, required: ['id', 'record_type'] } },
-      operational_lists: { schema: { version: 0, primaryKey: 'id', type: 'object', properties: { ...baseProps, ...makeProps(listKeys) }, required: ['id', 'record_type'] } },
-      tasks: { schema: { version: 0, primaryKey: 'id', type: 'object', properties: { ...baseProps, ...makeProps(taskKeys) }, required: ['id', 'record_type'] } }
-    });
-      
-      coreDB = db;
-      _window.__RXDB_INSTANCE__ = db;
+        animals: { schema: { version: 0, primaryKey: 'id', type: 'object', additionalProperties: true, properties: { ...baseProps, ...makeProps(animalKeys) }, required: ['id', 'record_type'] } },
+        admin_records: { schema: { version: 0, primaryKey: 'id', type: 'object', additionalProperties: true, properties: { ...baseProps, ...makeProps(adminKeys) }, required: ['id', 'record_type'] } },
+        daily_records: { schema: { version: 0, primaryKey: 'id', type: 'object', additionalProperties: true, properties: { ...baseProps, ...makeProps(dailyKeys) }, required: ['id', 'record_type'] } },
+        clinical_records: { schema: { version: 0, primaryKey: 'id', type: 'object', additionalProperties: true, properties: { ...baseProps, ...makeProps(clinicalKeys) }, required: ['id', 'record_type'] } },
+        logistics_records: { schema: { version: 0, primaryKey: 'id', type: 'object', additionalProperties: true, properties: { ...baseProps, ...makeProps(logisticsKeys) }, required: ['id', 'record_type'] } },
+        staff_records: { schema: { version: 0, primaryKey: 'id', type: 'object', additionalProperties: true, properties: { ...baseProps, ...makeProps(staffKeys) }, required: ['id', 'record_type'] } },
+        maintenance_logs: { schema: { version: 0, primaryKey: 'id', type: 'object', additionalProperties: true, properties: { ...baseProps, ...makeProps(maintenanceKeys) }, required: ['id', 'record_type'] } },
+        incidents: { schema: { version: 0, primaryKey: 'id', type: 'object', additionalProperties: true, properties: { ...baseProps, ...makeProps(incidentKeys) }, required: ['id', 'record_type'] } },
+        first_aid_logs: { schema: { version: 0, primaryKey: 'id', type: 'object', additionalProperties: true, properties: { ...baseProps, ...makeProps(firstAidKeys) }, required: ['id', 'record_type'] } },
+        safety_drills: { schema: { version: 0, primaryKey: 'id', type: 'object', additionalProperties: true, properties: { ...baseProps, ...makeProps(safetyDrillKeys) }, required: ['id', 'record_type'] } },
+        operational_lists: { schema: { version: 0, primaryKey: 'id', type: 'object', additionalProperties: true, properties: { ...baseProps, ...makeProps(listKeys) }, required: ['id', 'record_type'] } },
+        tasks: { schema: { version: 0, primaryKey: 'id', type: 'object', additionalProperties: true, properties: { ...baseProps, ...makeProps(taskKeys) }, required: ['id', 'record_type'] } }
+      });
+      return db;
+    };
+
+    console.log('💾 [Core DB] Booting Airtight Engine v52 (Sandbox-Bypass)...');
+
+    try {
+      // Attempt standard boot
+      coreDB = await attemptBoot('animaldb_core_v52');
       return coreDB;
-    } catch (e: unknown) {
-      const error = e as Error;
-      bootPromise = null;
-      _window.__RXDB_PROMISE__ = null;
-      
-      if (error.message && error.message.includes('DB9')) {
-        console.warn('⚠️ [Core DB] DB9 detected, attempting to recover existing instance...');
-        if (_window.__RXDB_INSTANCE__) {
-          coreDB = _window.__RXDB_INSTANCE__;
-          return coreDB;
-        }
+    } catch (e: any) {
+      // 🚨 THE SANDBOX BYPASS: If a Zombie DB9 locks the name, mutate the name and bypass it completely.
+      if (e.message && e.message.includes('DB9')) {
+        console.warn('🧟 Zombie DB9 detected in Sandbox! Mutating database name to bypass lock...');
+        const uniqueName = 'animaldb_core_v52_' + Date.now();
+        coreDB = await attemptBoot(uniqueName);
+        return coreDB;
       }
-      
-      console.error('Fatal DB Boot Error:', error);
-      throw error;
+      throw e;
     }
   })();
 
-  _window.__RXDB_PROMISE__ = bootPromise;
   return bootPromise;
 };
 
 const activeReplications: RxSupabaseReplicationState<unknown>[] = [];
-const syncTimers: NodeJS.Timeout[] = [];
 
-export const startCoreSync = async (db: RxDatabase, realSupabaseClient: unknown) => {
+export const startCoreSync = async (db: RxDatabase, realSupabaseClient: any) => {
   if (!db || !realSupabaseClient) return;
 
-  console.log('🔄 [Core DB] Engaging Authenticated Synchronization v51...');
+  console.log('🔄 [Core DB] Engaging Authenticated Synchronization v52...');
 
-  syncTimers.forEach(t => clearInterval(t));
-  syncTimers.length = 0;
   activeReplications.forEach(state => state.cancel());
   activeReplications.length = 0;
 
@@ -114,50 +107,33 @@ export const startCoreSync = async (db: RxDatabase, realSupabaseClient: unknown)
         try {
           const state = replicateSupabase({
             collection,
-            replicationIdentifier: `core_${colName}_${config.table}_v51`,
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            client: realSupabaseClient as any,
+            replicationIdentifier: `core_${colName}_${config.table}_v52`,
+            client: realSupabaseClient,
             tableName: config.table,
             deletedField: 'is_deleted',
             pull: { 
               batchSize: 100, 
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               modifier: (doc: any) => {
                 if (!doc.id) doc.id = doc.role || doc.name || doc.type || String(Date.now() + Math.random());
                 return { ...doc, id: String(doc.id), record_type: config.type };
               } 
             },
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             push: { modifier: (doc: any) => doc.record_type === config.type ? doc : null },
             live: false
           });
           
           state.error$.subscribe(err => {
-             const error = err as Error;
-             if (error?.message && !error.message.includes('Offline')) {
-                 console.error(`[Core Sync Error] ${config.table}:`, error);
+             if (err?.message && !err.message.includes('Offline')) {
+                 console.error(`[Core Sync Error] ${config.table}:`, err);
              }
           });
           
           activeReplications.push(state);
-        } catch {
-          // Ignore sync setup errors
-        }
+        } catch {}
       };
       
       executePull(); 
-      const timer = setInterval(executePull, 30000); 
-      syncTimers.push(timer); 
+      setInterval(executePull, 30000); 
     }
   }
 };
-
-// 🚨 THE VITE DETONATOR: Safely destroys the database before Vite hot-reloads
-if (import.meta.hot) {
-  import.meta.hot.dispose(() => {
-    console.log('🔥 [Core DB] HMR Dispose: Stopping sync timers...');
-    syncTimers.forEach(t => clearInterval(t));
-    activeReplications.forEach(state => state.cancel());
-    // We do NOT destroy the database here to allow reuse across hot reloads
-  });
-}
