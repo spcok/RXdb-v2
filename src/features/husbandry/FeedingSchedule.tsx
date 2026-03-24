@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { Animal, AnimalCategory, Task, LogType, OperationalList } from '../../types';
 import { CalendarClock, Plus, Calendar, Trash2, Filter, Utensils, RefreshCw, Loader2, History, ArrowRight, Copy } from 'lucide-react';
 import { useFeedingScheduleData } from './useFeedingScheduleData';
-import { coreDB as db } from '../../lib/DatabaseCore';
+import { coreDB, bootCoreDatabase } from '../../lib/DatabaseCore';
 
 const FeedingSchedule: React.FC = () => {
   const { animals, tasks, addTasks, deleteTask, isLoading } = useFeedingScheduleData();
@@ -11,15 +11,32 @@ const FeedingSchedule: React.FC = () => {
   const [foodOptions, setFoodOptions] = useState<OperationalList[]>([]);
 
   useEffect(() => {
-    if (!db) return;
+    let isMounted = true;
+    let sub: { unsubscribe: () => void } | null = null;
 
-    const sub = db.operational_lists.find({
-      selector: { type: 'food' }
-    }).$.subscribe(docs => {
-      setFoodOptions(docs.map(d => d.toJSON() as OperationalList));
-    });
+    const loadData = async () => {
+      try {
+        const db = coreDB || await bootCoreDatabase();
+        if (!isMounted) return;
 
-    return () => sub.unsubscribe();
+        sub = db.operational_lists.find({
+          selector: { type: 'food' }
+        }).$.subscribe(docs => {
+          if (isMounted) {
+            setFoodOptions(docs.map(d => d.toJSON() as OperationalList));
+          }
+        });
+      } catch (err) {
+        console.error('Failed to load food options:', err);
+      }
+    };
+
+    loadData();
+
+    return () => {
+      isMounted = false;
+      if (sub) sub.unsubscribe();
+    };
   }, []);
 
   const [selectedCategory, setSelectedCategory] = useState<AnimalCategory>(AnimalCategory.EXOTICS);

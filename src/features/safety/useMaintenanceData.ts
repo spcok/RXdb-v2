@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { coreDB as db } from '../../lib/DatabaseCore';
+import { coreDB, bootCoreDatabase } from '../../lib/DatabaseCore';
 import { MaintenanceLog } from '../../types';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -8,20 +8,39 @@ export function useMaintenanceData() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (!db) return;
+    let isMounted = true;
+    let sub: { unsubscribe: () => void } | null = null;
 
-    const sub = db.maintenance_logs.find({
-      selector: { is_deleted: { $eq: false } },
-      sort: [{ date: 'desc' }]
-    }).$.subscribe(docs => {
-      setLogs(docs.map(d => d.toJSON() as MaintenanceLog));
-      setIsLoading(false);
-    });
+    const loadData = async () => {
+      try {
+        const db = coreDB || await bootCoreDatabase();
+        if (!isMounted) return;
 
-    return () => sub.unsubscribe();
+        sub = db.maintenance_logs.find({
+          selector: { is_deleted: { $eq: false } },
+          sort: [{ date: 'desc' }]
+        }).$.subscribe(docs => {
+          if (isMounted) {
+            setLogs(docs.map(d => d.toJSON() as MaintenanceLog));
+            setIsLoading(false);
+          }
+        });
+      } catch (err) {
+        console.error('Failed to load maintenance data:', err);
+        if (isMounted) setIsLoading(false);
+      }
+    };
+
+    loadData();
+
+    return () => {
+      isMounted = false;
+      if (sub) sub.unsubscribe();
+    };
   }, []);
 
   const addLog = async (log: Omit<MaintenanceLog, 'id'>) => {
+    const db = coreDB || await bootCoreDatabase();
     const newLog: MaintenanceLog = {
       ...log,
       id: uuidv4(),
@@ -32,6 +51,7 @@ export function useMaintenanceData() {
   };
 
   const updateLog = async (log: MaintenanceLog) => {
+    const db = coreDB || await bootCoreDatabase();
     await db.maintenance_logs.upsert({
       ...log,
       updated_at: new Date().toISOString()
@@ -39,6 +59,7 @@ export function useMaintenanceData() {
   };
 
   const deleteLog = async (id: string) => {
+    const db = coreDB || await bootCoreDatabase();
     const logDoc = await db.maintenance_logs.findOne(id).exec();
     if (logDoc) {
       const log = logDoc.toJSON();

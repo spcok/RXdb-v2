@@ -22,8 +22,9 @@ const LoginScreen: React.FC = () => {
 
     try {
       await login(email, password);
-    } catch (err: any) {
-      setError(err.message || 'An unexpected error occurred. Please try again later.');
+    } catch (err: unknown) {
+      const error = err as { message?: string };
+      setError(error.message || 'An unexpected error occurred. Please try again later.');
     } finally {
       setIsSubmitting(false);
     }

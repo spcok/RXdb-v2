@@ -5,7 +5,7 @@ import {
   CheckCircle2, Info,
   Download, Trash2, ShieldX
 } from 'lucide-react';
-import { coreDB as db } from '../../../lib/DatabaseCore';
+import { coreDB, bootCoreDatabase } from '../../../lib/DatabaseCore';
 import { removeRxDatabase } from 'rxdb';
 import { getRxStorageDexie } from 'rxdb/plugins/storage-dexie';
 
@@ -28,7 +28,7 @@ const SystemHealth: React.FC = () => {
   const exportLocalDatabase = async () => {
     setIsExporting(true);
     try {
-      if (!db) return;
+      const db = coreDB || await bootCoreDatabase();
       const exportData: Record<string, unknown[]> = {};
       
       const collections = Object.keys(db.collections);
@@ -47,9 +47,8 @@ const SystemHealth: React.FC = () => {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error('🛠️ [Diagnostics] Export failed:', error);
-      alert('Failed to export database.');
+    } catch (err) {
+      console.error('🛠️ [Diagnostics] Export failed:', err);
     } finally {
       setIsExporting(false);
     }
@@ -64,14 +63,14 @@ const SystemHealth: React.FC = () => {
       if (secondConfirm === 'PURGE') {
         try {
           console.warn('🚨 [Diagnostics] Initiating emergency local database purge...');
+          const db = coreDB || await bootCoreDatabase();
           if (db) {
             await removeRxDatabase('animaldb_v11', getRxStorageDexie());
           }
           localStorage.clear();
           window.location.reload();
-        } catch (error) {
-          console.error('🛠️ [Diagnostics] Purge failed:', error);
-          alert('Failed to purge database.');
+        } catch (err) {
+          console.error('🛠️ [Diagnostics] Purge failed:', err);
         }
       }
     }

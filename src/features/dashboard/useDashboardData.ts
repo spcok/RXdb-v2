@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Animal, AnimalCategory, LogType, LogEntry } from '../../types';
-import { coreDB as db } from '../../lib/DatabaseCore';
+import { coreDB, bootCoreDatabase } from '../../lib/DatabaseCore';
 import { useTaskData } from '../husbandry/useTaskData';
 
 export interface EnhancedAnimal extends Animal {
@@ -31,34 +31,46 @@ export function useDashboardData(activeTab: AnimalCategory | 'ARCHIVED', viewDat
 
   useEffect(() => {
     let isMounted = true;
-    if (!db) return;
+    let subs: { unsubscribe: () => void }[] = [];
 
-    const liveSub = db.animals.find({
-      selector: { record_type: 'animals' }
-    }).$.subscribe(docs => {
-      if (isMounted) {
-        setLiveAnimals(docs.map(d => d.toJSON() as Animal));
-        setIsLoading(false);
+    const loadData = async () => {
+      try {
+        const db = coreDB || await bootCoreDatabase();
+        if (!isMounted) return;
+
+        const liveSub = db.animals.find({
+          selector: { record_type: 'animals' }
+        }).$.subscribe(docs => {
+          if (isMounted) {
+            setLiveAnimals(docs.map(d => d.toJSON() as Animal));
+            setIsLoading(false);
+          }
+        });
+
+        const archivedSub = db.animals.find({
+          selector: { record_type: 'archived_animals' }
+        }).$.subscribe(docs => {
+          if (isMounted) setArchivedAnimals(docs.map(d => d.toJSON() as Animal));
+        });
+
+        const logsSub = db.daily_records.find({
+          selector: { log_date: viewDate }
+        }).$.subscribe(docs => {
+          if (isMounted) setLogs(docs.map(d => d.toJSON() as LogEntry));
+        });
+
+        subs = [liveSub, archivedSub, logsSub];
+      } catch (err) {
+        console.error('Failed to load dashboard data:', err);
+        if (isMounted) setIsLoading(false);
       }
-    });
+    };
 
-    const archivedSub = db.animals.find({
-      selector: { record_type: 'archived_animals' }
-    }).$.subscribe(docs => {
-      if (isMounted) setArchivedAnimals(docs.map(d => d.toJSON() as Animal));
-    });
-
-    const logsSub = db.daily_records.find({
-      selector: { log_date: viewDate }
-    }).$.subscribe(docs => {
-      if (isMounted) setLogs(docs.map(d => d.toJSON() as LogEntry));
-    });
+    loadData();
 
     return () => {
       isMounted = false;
-      liveSub.unsubscribe();
-      archivedSub.unsubscribe();
-      logsSub.unsubscribe();
+      subs.forEach(sub => sub.unsubscribe());
     };
   }, [viewDate]);
 

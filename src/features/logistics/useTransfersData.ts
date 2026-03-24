@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { coreDB as db } from '../../lib/DatabaseCore';
+import { coreDB, bootCoreDatabase } from '../../lib/DatabaseCore';
 import { ExternalTransfer } from '../../types';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -8,23 +8,42 @@ export function useTransfersData() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (!db) return;
+    let isMounted = true;
+    let sub: { unsubscribe: () => void } | null = null;
 
-    const sub = db.logistics_records.find({
-      selector: { 
-        is_deleted: { $eq: false },
-        record_type: { $eq: 'transfers' }
-      },
-      sort: [{ date: 'desc' }]
-    }).$.subscribe(docs => {
-      setTransfers(docs.map(d => d.toJSON() as ExternalTransfer));
-      setIsLoading(false);
-    });
+    const loadData = async () => {
+      try {
+        const db = coreDB || await bootCoreDatabase();
+        if (!isMounted) return;
 
-    return () => sub.unsubscribe();
+        sub = db.logistics_records.find({
+          selector: { 
+            is_deleted: { $eq: false },
+            record_type: { $eq: 'transfers' }
+          },
+          sort: [{ date: 'desc' }]
+        }).$.subscribe(docs => {
+          if (isMounted) {
+            setTransfers(docs.map(d => d.toJSON() as ExternalTransfer));
+            setIsLoading(false);
+          }
+        });
+      } catch (err) {
+        console.error('Failed to load transfers data:', err);
+        if (isMounted) setIsLoading(false);
+      }
+    };
+
+    loadData();
+
+    return () => {
+      isMounted = false;
+      if (sub) sub.unsubscribe();
+    };
   }, []);
 
   const addTransfer = async (transfer: Omit<ExternalTransfer, 'id'>) => {
+    const db = coreDB || await bootCoreDatabase();
     const newTransfer: ExternalTransfer = {
       ...transfer,
       id: uuidv4(),

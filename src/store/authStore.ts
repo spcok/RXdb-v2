@@ -1,10 +1,11 @@
 import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
 import { Session } from '@supabase/supabase-js';
+import { User } from '../types';
 
 interface AuthState {
   session: Session | null;
-  currentUser: any | null; 
+  currentUser: User | null; 
   isLoading: boolean;
   isUiLocked: boolean;
   setUiLocked: (locked: boolean) => void;

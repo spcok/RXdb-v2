@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { coreDB as db } from '../../lib/DatabaseCore';
+import { coreDB, bootCoreDatabase } from '../../lib/DatabaseCore';
 import { Holiday } from '../../types';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -8,23 +8,42 @@ export function useHolidayData() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (!db) return;
+    let isMounted = true;
+    let sub: { unsubscribe: () => void } | null = null;
 
-    const sub = db.staff_records.find({
-      selector: { 
-        is_deleted: { $eq: false },
-        record_type: { $eq: 'holidays' }
-      },
-      sort: [{ start_date: 'desc' }]
-    }).$.subscribe(docs => {
-      setHolidays(docs.map(d => d.toJSON() as Holiday));
-      setIsLoading(false);
-    });
+    const loadData = async () => {
+      try {
+        const db = coreDB || await bootCoreDatabase();
+        if (!isMounted) return;
 
-    return () => sub.unsubscribe();
+        sub = db.staff_records.find({
+          selector: { 
+            is_deleted: { $eq: false },
+            record_type: { $eq: 'holidays' }
+          },
+          sort: [{ start_date: 'desc' }]
+        }).$.subscribe(docs => {
+          if (isMounted) {
+            setHolidays(docs.map(d => d.toJSON() as Holiday));
+            setIsLoading(false);
+          }
+        });
+      } catch (err) {
+        console.error('Failed to load holiday data:', err);
+        if (isMounted) setIsLoading(false);
+      }
+    };
+
+    loadData();
+
+    return () => {
+      isMounted = false;
+      if (sub) sub.unsubscribe();
+    };
   }, []);
 
   const addHoliday = async (holiday: Omit<Holiday, 'id'>) => {
+    const db = coreDB || await bootCoreDatabase();
     const newHoliday: Holiday = {
       ...holiday,
       id: uuidv4(),
@@ -36,6 +55,7 @@ export function useHolidayData() {
   };
 
   const deleteHoliday = async (id: string) => {
+    const db = coreDB || await bootCoreDatabase();
     const holidayDoc = await db.staff_records.findOne(id).exec();
     if (holidayDoc) {
       const holiday = holidayDoc.toJSON();

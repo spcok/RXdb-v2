@@ -14,7 +14,7 @@ import {
   Wrench
 } from 'lucide-react';
 import { renderAsync } from 'docx-preview';
-import { coreDB as db } from '../../lib/DatabaseCore';
+import { coreDB, bootCoreDatabase } from '../../lib/DatabaseCore';
 import { Animal, UserRole, Shift, ClinicalNote, MARChart, InternalMovement, ExternalTransfer, MaintenanceLog } from '../../types';
 import { generateDailyLogDocx, generateInternalMovementsDocx, generateExternalTransfersDocx, generateSiteMaintenanceDocx, generateAnimalCensusDocx, generateSection9Docx, generateDeathCertificateDocx, generateStaffRotaDocx, generateInspectionPackage } from './utils/docxExportService';
 import { useAuthStore } from '../../store/authStore';
@@ -143,30 +143,51 @@ export default function ReportsDashboard() {
   const [rawShifts, setRawShifts] = useState<Shift[]>([]);
 
   useEffect(() => {
-    if (!db) return;
+    let isMounted = true;
+    let animalsSub: { unsubscribe: () => void } | null = null;
+    let archivedSub: { unsubscribe: () => void } | null = null;
+    let shiftsSub: { unsubscribe: () => void } | null = null;
 
-    const animalsSub = db.animals.find({
-      selector: { record_type: 'animals', is_deleted: { $eq: false } }
-    }).$.subscribe(docs => {
-      setAnimals(docs.map(d => d.toJSON() as Animal));
-    });
+    const loadData = async () => {
+      try {
+        const db = coreDB || await bootCoreDatabase();
+        if (!isMounted) return;
 
-    const archivedSub = db.animals.find({
-      selector: { record_type: 'archived_animals', is_deleted: { $eq: false } }
-    }).$.subscribe(docs => {
-      setArchivedAnimals(docs.map(d => d.toJSON() as Animal));
-    });
+        animalsSub = db.animals.find({
+          selector: { record_type: 'animals', is_deleted: { $eq: false } }
+        }).$.subscribe(docs => {
+          if (isMounted) {
+            setAnimals(docs.map(d => d.toJSON() as Animal));
+          }
+        });
 
-    const shiftsSub = db.staff_records.find({
-      selector: { record_type: 'shifts', is_deleted: { $eq: false } }
-    }).$.subscribe(docs => {
-      setRawShifts(docs.map(d => d.toJSON() as Shift));
-    });
+        archivedSub = db.animals.find({
+          selector: { record_type: 'archived_animals', is_deleted: { $eq: false } }
+        }).$.subscribe(docs => {
+          if (isMounted) {
+            setArchivedAnimals(docs.map(d => d.toJSON() as Animal));
+          }
+        });
+
+        shiftsSub = db.staff_records.find({
+          selector: { record_type: 'shifts', is_deleted: { $eq: false } }
+        }).$.subscribe(docs => {
+          if (isMounted) {
+            setRawShifts(docs.map(d => d.toJSON() as Shift));
+          }
+        });
+      } catch (err) {
+        console.error('Failed to load dashboard data:', err);
+      }
+    };
+
+    loadData();
 
     return () => {
-      animalsSub.unsubscribe();
-      archivedSub.unsubscribe();
-      shiftsSub.unsubscribe();
+      isMounted = false;
+      if (animalsSub) animalsSub.unsubscribe();
+      if (archivedSub) archivedSub.unsubscribe();
+      if (shiftsSub) shiftsSub.unsubscribe();
     };
   }, []);
 
@@ -193,7 +214,7 @@ export default function ReportsDashboard() {
 
   const uniqueSections = activeReportId === 'staff_rota'
     ? Object.values(UserRole)
-    : Array.from(new Set((animals || []).map(a => (a as unknown as Record<string, string>).section || a.category).filter(Boolean))).sort();
+    : Array.from(new Set((animals || []).map(a => (a as unknown as { section?: string, category?: string }).section || a.category).filter(Boolean))).sort();
 
   // Preview State
   const [previewBlob, setPreviewBlob] = useState<Blob | null>(null);
@@ -210,6 +231,7 @@ export default function ReportsDashboard() {
     setError(null);
 
     try {
+      const db = coreDB || await bootCoreDatabase();
       const animalSectionMap = new Map(
         (animals || []).map(a => [a.id, (a as unknown as Record<string, string>).section || a.category])
       );
@@ -251,7 +273,7 @@ export default function ReportsDashboard() {
             reportName: dynamicTitle,
             startDate,
             endDate,
-            generatedBy: currentUser?.name?.split(' ').map(n => n[0]).join('').toUpperCase() || 'STAFF'
+            generatedBy: String(currentUser?.name || '').split(' ').map(n => n[0]).join('').toUpperCase() || 'STAFF'
           }
         );
         setPreviewBlob(blob);
@@ -289,7 +311,7 @@ export default function ReportsDashboard() {
             reportName: dynamicTitle,
             startDate,
             endDate,
-            generatedBy: currentUser?.name?.split(' ').map(n => n[0]).join('').toUpperCase() || 'STAFF'
+            generatedBy: String(currentUser?.name || '').split(' ').map(n => n[0]).join('').toUpperCase() || 'STAFF'
           }
         );
         setPreviewBlob(blob);
@@ -327,7 +349,7 @@ export default function ReportsDashboard() {
             reportName: dynamicTitle,
             startDate,
             endDate,
-            generatedBy: currentUser?.name?.split(' ').map(n => n[0]).join('').toUpperCase() || 'STAFF'
+            generatedBy: String(currentUser?.name || '').split(' ').map(n => n[0]).join('').toUpperCase() || 'STAFF'
           }
         );
         setPreviewBlob(blob);
@@ -357,7 +379,7 @@ export default function ReportsDashboard() {
             reportName: activeReport.title,
             startDate,
             endDate,
-            generatedBy: currentUser?.name?.split(' ').map(n => n[0]).join('').toUpperCase() || 'STAFF'
+            generatedBy: String(currentUser?.name || '').split(' ').map(n => n[0]).join('').toUpperCase() || 'STAFF'
           },
           orientation
         );
@@ -378,7 +400,7 @@ export default function ReportsDashboard() {
           const isActive = a.disposition_status !== 'Deceased' && 
                            a.disposition_status !== 'Transferred' && 
                            !a.archived;
-          const matchesSection = selectedSection ? ((a as unknown as Record<string, string>).section === selectedSection || a.category === selectedSection) : true;
+          const matchesSection = selectedSection ? ((a as unknown as { section?: string, category?: string }).section === selectedSection || a.category === selectedSection) : true;
           return isActive && matchesSection && !linkedChildIds.has(a.id);
         });
 
@@ -390,8 +412,8 @@ export default function ReportsDashboard() {
             animal.species || '--',
             animal.latin_name || '--',
             animal.sex || '--',
-            animal.ring_number || (animal as unknown as Record<string, string>).id_number || '--',
-            animal.location || (animal as unknown as Record<string, string>).enclosure || '--',
+            animal.ring_number || (animal as unknown as { id_number?: string }).id_number || '--',
+            animal.location || (animal as unknown as { enclosure?: string }).enclosure || '--',
             animal.disposition_status || 'Active'
           ];
         });
@@ -402,7 +424,7 @@ export default function ReportsDashboard() {
             reportName: dynamicTitle,
             startDate,
             endDate,
-            generatedBy: currentUser?.name?.split(' ').map(n => n[0]).join('').toUpperCase() || 'STAFF'
+            generatedBy: String(currentUser?.name || '').split(' ').map(n => n[0]).join('').toUpperCase() || 'STAFF'
           },
           orientation
         );
@@ -497,7 +519,7 @@ export default function ReportsDashboard() {
             reportName: dynamicTitle,
             startDate,
             endDate,
-            generatedBy: currentUser?.name?.split(' ').map(n => n[0]).join('').toUpperCase() || 'STAFF'
+            generatedBy: String(currentUser?.name || '').split(' ').map(n => n[0]).join('').toUpperCase() || 'STAFF'
           },
           orientation
         );
@@ -520,7 +542,7 @@ export default function ReportsDashboard() {
             reportName: dynamicTitle,
             startDate: '',
             endDate: '',
-            generatedBy: currentUser?.name?.split(' ').map(n => n[0]).join('').toUpperCase() || 'STAFF'
+            generatedBy: String(currentUser?.name || '').split(' ').map(n => n[0]).join('').toUpperCase() || 'STAFF'
           }
         );
         setPreviewBlob(blob);
@@ -552,7 +574,7 @@ export default function ReportsDashboard() {
             reportName: dynamicTitle,
             startDate,
             endDate,
-            generatedBy: currentUser?.name?.split(' ').map((n: string) => n[0]).join('').toUpperCase() || 'STAFF'
+            generatedBy: String(currentUser?.name || '').split(' ').map((n: string) => n[0]).join('').toUpperCase() || 'STAFF'
           },
           orientation
         );
@@ -610,7 +632,7 @@ export default function ReportsDashboard() {
             reportName: dynamicTitle,
             startDate,
             endDate,
-            generatedBy: currentUser?.name?.split(' ').map(n => n[0]).join('').toUpperCase() || 'STAFF'
+            generatedBy: String(currentUser?.name || '').split(' ').map(n => n[0]).join('').toUpperCase() || 'STAFF'
           }
         );
         setPreviewBlob(blob);
@@ -624,7 +646,7 @@ export default function ReportsDashboard() {
         return;
       }
       // ... handle other reports ...
-    } catch (err) {
+    } catch (err: unknown) {
       console.error("Failed to generate preview:", err);
       setError(err instanceof Error ? err.message : 'Failed to generate report');
     } finally {

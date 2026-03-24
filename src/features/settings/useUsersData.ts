@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { coreDB as db } from '../../lib/DatabaseCore';
+import { coreDB, bootCoreDatabase } from '../../lib/DatabaseCore';
 import { User, RolePermissionConfig } from '../../types';
 import { supabase } from '../../lib/supabase';
 
@@ -13,35 +13,54 @@ export function useUsersData() {
   }, []);
 
   useEffect(() => {
-    if (!db) return;
+    let isMounted = true;
+    let subs: { unsubscribe: () => void }[] = [];
 
-    const subUsers = db.admin_records.find({
-      selector: {
-        record_type: 'user',
-        is_deleted: { $eq: false }
-      }
-    }).$.subscribe(docs => {
-      setUsers(docs.map(d => d.toJSON() as unknown as User));
-      setIsLoading(false);
-    });
+    const loadData = async () => {
+      try {
+        const db = coreDB || await bootCoreDatabase();
+        if (!isMounted) return;
 
-    const subRoles = db.admin_records.find({
-      selector: {
-        record_type: 'role_permission',
-        is_deleted: { $eq: false }
+        const usersSub = db.admin_records.find({
+          selector: {
+            record_type: 'user',
+            is_deleted: { $eq: false }
+          }
+        }).$.subscribe(docs => {
+          if (isMounted) {
+            setUsers(docs.map(d => d.toJSON() as unknown as User));
+            setIsLoading(false);
+          }
+        });
+
+        const rolesSub = db.admin_records.find({
+          selector: {
+            record_type: 'role_permission',
+            is_deleted: { $eq: false }
+          }
+        }).$.subscribe(docs => {
+          if (isMounted) {
+            const rolesData = docs.map(d => d.toJSON() as unknown as RolePermissionConfig);
+            const roleOrder = ['VOLUNTEER', 'KEEPER', 'SENIOR_KEEPER', 'ADMIN', 'OWNER'];
+            const sortedRoles = rolesData.sort((a, b) => 
+              roleOrder.indexOf(a.role) - roleOrder.indexOf(b.role)
+            );
+            setRolePermissions(sortedRoles);
+          }
+        });
+
+        subs = [usersSub, rolesSub];
+      } catch (err) {
+        console.error('Failed to load users data:', err);
+        if (isMounted) setIsLoading(false);
       }
-    }).$.subscribe(docs => {
-      const rolesData = docs.map(d => d.toJSON() as unknown as RolePermissionConfig);
-      const roleOrder = ['VOLUNTEER', 'KEEPER', 'SENIOR_KEEPER', 'ADMIN', 'OWNER'];
-      const sortedRoles = rolesData.sort((a, b) => 
-        roleOrder.indexOf(a.role) - roleOrder.indexOf(b.role)
-      );
-      setRolePermissions(sortedRoles);
-    });
+    };
+
+    loadData();
 
     return () => {
-      subUsers.unsubscribe();
-      subRoles.unsubscribe();
+      isMounted = false;
+      subs.forEach(sub => sub.unsubscribe());
     };
   }, []);
 
@@ -58,6 +77,7 @@ export function useUsersData() {
     if (data?.error) throw new Error(`Deletion Failed: ${data.error}`);
     
     // Also delete locally
+    const db = coreDB || await bootCoreDatabase();
     const doc = await db.admin_records.findOne(id).exec();
     if (doc) {
       await doc.patch({ is_deleted: true, updated_at: new Date().toISOString() });
@@ -65,6 +85,7 @@ export function useUsersData() {
   };
 
   const updateUser = async (id: string, updates: Partial<User>) => {
+    const db = coreDB || await bootCoreDatabase();
     const doc = await db.admin_records.findOne(id).exec();
     if (doc) {
       await doc.patch({
@@ -75,6 +96,7 @@ export function useUsersData() {
   };
 
   const updateRolePermissions = async (role: string, updates: Partial<RolePermissionConfig>) => {
+    const db = coreDB || await bootCoreDatabase();
     const docs = await db.admin_records.find({
       selector: {
         record_type: 'role_permission',

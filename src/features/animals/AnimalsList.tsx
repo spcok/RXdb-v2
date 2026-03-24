@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { coreDB as db } from '../../lib/DatabaseCore';
+import { coreDB, bootCoreDatabase } from '../../lib/DatabaseCore';
 import { Animal } from '../../types';
 import { usePermissions } from '../../hooks/usePermissions';
 
@@ -9,13 +9,31 @@ export const AnimalsList = ({ animals, onSelectAnimal }: { animals: Animal[], on
   const permissions = usePermissions();
 
   useEffect(() => {
-    if (!db) return;
-    const sub = db.animals.find({
-      selector: { record_type: 'archived_animals' }
-    }).$.subscribe(docs => {
-      setArchivedAnimals(docs.map(d => d.toJSON() as Animal));
-    });
-    return () => sub.unsubscribe();
+    let isMounted = true;
+    let sub: { unsubscribe: () => void } | null = null;
+
+    const loadData = async () => {
+      try {
+        const db = coreDB || await bootCoreDatabase();
+        if (!isMounted) return;
+
+        sub = db.animals.find({
+          selector: { record_type: 'archived_animals' }
+        }).$.subscribe(docs => {
+          if (isMounted) {
+            setArchivedAnimals(docs.map(d => d.toJSON() as Animal));
+          }
+        });
+      } catch (err) {
+        console.error('Failed to load archived animals:', err);
+      }
+    };
+
+    loadData();
+    return () => {
+      isMounted = false;
+      if (sub) sub.unsubscribe();
+    };
   }, []);
 
   const canViewArchived = permissions.isAdmin || permissions.isOwner;

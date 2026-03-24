@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { coreDB as db } from '../../lib/DatabaseCore';
+import { coreDB, bootCoreDatabase } from '../../lib/DatabaseCore';
 import { InternalMovement } from '../../types';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -8,23 +8,42 @@ export function useMovementsData() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (!db) return;
+    let isMounted = true;
+    let sub: { unsubscribe: () => void } | null = null;
 
-    const sub = db.logistics_records.find({
-      selector: { 
-        is_deleted: { $eq: false },
-        record_type: { $eq: 'movements' }
-      },
-      sort: [{ log_date: 'desc' }]
-    }).$.subscribe(docs => {
-      setMovements(docs.map(d => d.toJSON() as InternalMovement));
-      setIsLoading(false);
-    });
+    const loadData = async () => {
+      try {
+        const db = coreDB || await bootCoreDatabase();
+        if (!isMounted) return;
 
-    return () => sub.unsubscribe();
+        sub = db.logistics_records.find({
+          selector: { 
+            is_deleted: { $eq: false },
+            record_type: { $eq: 'movements' }
+          },
+          sort: [{ log_date: 'desc' }]
+        }).$.subscribe(docs => {
+          if (isMounted) {
+            setMovements(docs.map(d => d.toJSON() as InternalMovement));
+            setIsLoading(false);
+          }
+        });
+      } catch (err) {
+        console.error('Failed to load movements data:', err);
+        if (isMounted) setIsLoading(false);
+      }
+    };
+
+    loadData();
+
+    return () => {
+      isMounted = false;
+      if (sub) sub.unsubscribe();
+    };
   }, []);
 
   const addMovement = async (movement: Omit<InternalMovement, 'id' | 'created_by'>) => {
+    const db = coreDB || await bootCoreDatabase();
     const newMovement: InternalMovement = {
       ...movement,
       id: uuidv4(),

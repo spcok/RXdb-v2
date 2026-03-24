@@ -9,10 +9,10 @@ import {
   ZoomIn, ZoomOut, Utensils
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
-// import { usePermissions } from '../../hooks/usePermissions';
+import { usePermissions } from '../../hooks/usePermissions';
 import { useAppData } from '../../context/Context';
-// import { useOrgSettings } from '../../features/settings/useOrgSettings';
-// import GlobalBugReporter from '../ui/GlobalBugReporter';
+import { useOrgSettings } from '../../features/settings/useOrgSettings';
+import GlobalBugReporter from '../ui/GlobalBugReporter';
 import { useNetworkStatus } from '../../hooks/useNetworkStatus';
 import { UpdateBanner } from './UpdateBanner';
 import { InstallButton } from '../ui/InstallButton';
@@ -64,8 +64,8 @@ const SectionHeader = ({ title, isSidebarCollapsed }: { title: string, isSidebar
 
 const Layout: React.FC<LayoutProps> = () => {
   const { currentUser, logout } = useAuthStore();
-  // const permissions = usePermissions();
-  const permissions = {} as Record<string, boolean>;
+  const permissions = usePermissions(); // 🔥 RESTORED
+  
   const { 
     view_daily_logs, view_tasks, view_medical, view_movements, 
     view_daily_rounds, view_maintenance, view_incidents, 
@@ -73,9 +73,9 @@ const Layout: React.FC<LayoutProps> = () => {
     request_holidays, view_missing_records, generate_reports, 
     view_settings 
   } = permissions;
+  
   const { activeShift, clockIn, clockOut } = useAppData();
-  // const { settings: orgSettings } = useOrgSettings();
-  const orgSettings = null as { logo_url?: string } | null;
+  const { settings: orgSettings } = useOrgSettings(); // 🔥 RESTORED
   const { isOnline } = useNetworkStatus();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -168,33 +168,33 @@ const Layout: React.FC<LayoutProps> = () => {
         <SectionHeader title="Main Menu" isSidebarCollapsed={isSidebarCollapsed} />
         <NavItem to="/" icon={LayoutDashboard} label="Dashboard" permission={true} isSidebarCollapsed={isSidebarCollapsed} setIsMobileMenuOpen={setIsMobileMenuOpen} />
         <NavItem to="/weather" icon={CloudSun} label="Weather" permission={true} isSidebarCollapsed={isSidebarCollapsed} setIsMobileMenuOpen={setIsMobileMenuOpen} />
-        <NavItem to="/daily-log" icon={ClipboardList} label="Daily Log" permission={view_daily_logs} isSidebarCollapsed={isSidebarCollapsed} setIsMobileMenuOpen={setIsMobileMenuOpen} />
-        <NavItem to="/daily-rounds" icon={ClipboardCheck} label="Daily Rounds" permission={view_daily_rounds} isSidebarCollapsed={isSidebarCollapsed} setIsMobileMenuOpen={setIsMobileMenuOpen} />
-        <NavItem to="/tasks" icon={ListTodo} label="To-Do List" permission={view_tasks} isSidebarCollapsed={isSidebarCollapsed} setIsMobileMenuOpen={setIsMobileMenuOpen} />
+        <NavItem to="/daily-log" icon={ClipboardList} label="Daily Log" permission={!!view_daily_logs} isSidebarCollapsed={isSidebarCollapsed} setIsMobileMenuOpen={setIsMobileMenuOpen} />
+        <NavItem to="/daily-rounds" icon={ClipboardCheck} label="Daily Rounds" permission={!!view_daily_rounds} isSidebarCollapsed={isSidebarCollapsed} setIsMobileMenuOpen={setIsMobileMenuOpen} />
+        <NavItem to="/tasks" icon={ListTodo} label="To-Do List" permission={!!view_tasks} isSidebarCollapsed={isSidebarCollapsed} setIsMobileMenuOpen={setIsMobileMenuOpen} />
         <NavItem to="/feeding-schedule" icon={Utensils} label="Feeding Schedule" permission={true} isSidebarCollapsed={isSidebarCollapsed} setIsMobileMenuOpen={setIsMobileMenuOpen} />
 
         <SectionHeader title="Animal Care" isSidebarCollapsed={isSidebarCollapsed} />
-        <NavItem to="/medical" icon={Stethoscope} label="Medical Records" permission={view_medical} isSidebarCollapsed={isSidebarCollapsed} setIsMobileMenuOpen={setIsMobileMenuOpen} />
-        <NavItem to="/movements" icon={ArrowLeftRight} label="Movements" permission={view_movements} isSidebarCollapsed={isSidebarCollapsed} setIsMobileMenuOpen={setIsMobileMenuOpen} />
+        <NavItem to="/medical" icon={Stethoscope} label="Medical Records" permission={!!view_medical} isSidebarCollapsed={isSidebarCollapsed} setIsMobileMenuOpen={setIsMobileMenuOpen} />
+        <NavItem to="/movements" icon={ArrowLeftRight} label="Movements" permission={!!view_movements} isSidebarCollapsed={isSidebarCollapsed} setIsMobileMenuOpen={setIsMobileMenuOpen} />
         <NavItem to="/flight-records" icon={Map} label="Flight Records" permission={true} isSidebarCollapsed={isSidebarCollapsed} setIsMobileMenuOpen={setIsMobileMenuOpen} />
 
         <SectionHeader title="Site & Safety" isSidebarCollapsed={isSidebarCollapsed} />
-        <NavItem to="/maintenance" icon={Wrench} label="Site Maintenance" permission={view_maintenance} isSidebarCollapsed={isSidebarCollapsed} setIsMobileMenuOpen={setIsMobileMenuOpen} />
-        <NavItem to="/incidents" icon={ShieldAlert} label="Incident Reports" permission={view_incidents} isSidebarCollapsed={isSidebarCollapsed} setIsMobileMenuOpen={setIsMobileMenuOpen} />
-        <NavItem to="/first-aid" icon={Heart} label="First Aid Log" permission={view_first_aid} isSidebarCollapsed={isSidebarCollapsed} setIsMobileMenuOpen={setIsMobileMenuOpen} />
-        <NavItem to="/safety-drills" icon={AlertOctagon} label="Safety Drills" permission={view_safety_drills} isSidebarCollapsed={isSidebarCollapsed} setIsMobileMenuOpen={setIsMobileMenuOpen} />
+        <NavItem to="/maintenance" icon={Wrench} label="Site Maintenance" permission={!!view_maintenance} isSidebarCollapsed={isSidebarCollapsed} setIsMobileMenuOpen={setIsMobileMenuOpen} />
+        <NavItem to="/incidents" icon={ShieldAlert} label="Incident Reports" permission={!!view_incidents} isSidebarCollapsed={isSidebarCollapsed} setIsMobileMenuOpen={setIsMobileMenuOpen} />
+        <NavItem to="/first-aid" icon={Heart} label="First Aid Log" permission={!!view_first_aid} isSidebarCollapsed={isSidebarCollapsed} setIsMobileMenuOpen={setIsMobileMenuOpen} />
+        <NavItem to="/safety-drills" icon={AlertOctagon} label="Safety Drills" permission={!!view_safety_drills} isSidebarCollapsed={isSidebarCollapsed} setIsMobileMenuOpen={setIsMobileMenuOpen} />
 
         <SectionHeader title="Staff" isSidebarCollapsed={isSidebarCollapsed} />
-        <NavItem to="/timesheets" icon={Clock} label="Time Sheets" permission={submit_timesheets} isSidebarCollapsed={isSidebarCollapsed} setIsMobileMenuOpen={setIsMobileMenuOpen} />
-        <NavItem to="/holidays" icon={Calendar} label="Holiday Registry" permission={request_holidays} isSidebarCollapsed={isSidebarCollapsed} setIsMobileMenuOpen={setIsMobileMenuOpen} />
+        <NavItem to="/timesheets" icon={Clock} label="Time Sheets" permission={!!submit_timesheets} isSidebarCollapsed={isSidebarCollapsed} setIsMobileMenuOpen={setIsMobileMenuOpen} />
+        <NavItem to="/holidays" icon={Calendar} label="Holiday Registry" permission={!!request_holidays} isSidebarCollapsed={isSidebarCollapsed} setIsMobileMenuOpen={setIsMobileMenuOpen} />
         <NavItem to="/rota" icon={CalendarDays} label="Staff Rota" permission={true} isSidebarCollapsed={isSidebarCollapsed} setIsMobileMenuOpen={setIsMobileMenuOpen} />
 
         <SectionHeader title="Compliance" isSidebarCollapsed={isSidebarCollapsed} />
-        <NavItem to="/compliance" icon={ShieldCheck} label="ZLA Compliance" permission={view_missing_records} isSidebarCollapsed={isSidebarCollapsed} setIsMobileMenuOpen={setIsMobileMenuOpen} />
-        <NavItem to="/reports" icon={FileText} label="Reports" permission={generate_reports} isSidebarCollapsed={isSidebarCollapsed} setIsMobileMenuOpen={setIsMobileMenuOpen} />
+        <NavItem to="/compliance" icon={ShieldCheck} label="ZLA Compliance" permission={!!view_missing_records} isSidebarCollapsed={isSidebarCollapsed} setIsMobileMenuOpen={setIsMobileMenuOpen} />
+        <NavItem to="/reports" icon={FileText} label="Reports" permission={!!generate_reports} isSidebarCollapsed={isSidebarCollapsed} setIsMobileMenuOpen={setIsMobileMenuOpen} />
 
         <SectionHeader title="System" isSidebarCollapsed={isSidebarCollapsed} />
-        <NavItem to="/settings" icon={SettingsIcon} label="Settings" permission={view_settings} isSidebarCollapsed={isSidebarCollapsed} setIsMobileMenuOpen={setIsMobileMenuOpen} />
+        <NavItem to="/settings" icon={SettingsIcon} label="Settings" permission={!!view_settings} isSidebarCollapsed={isSidebarCollapsed} setIsMobileMenuOpen={setIsMobileMenuOpen} />
         <NavItem to="/help" icon={HelpCircle} label="Help & Support" permission={true} isSidebarCollapsed={isSidebarCollapsed} setIsMobileMenuOpen={setIsMobileMenuOpen} />
 
         {/* Text Size Controls */}
@@ -239,7 +239,7 @@ const Layout: React.FC<LayoutProps> = () => {
                 <Power size={14}/> CLOCK OUT
               </button>
             ) : (
-              <button onClick={() => { console.log('Clock In clicked'); clockIn(currentUser?.initials || ''); }} className="w-full bg-emerald-600 text-white rounded-lg py-2 text-xs font-bold flex items-center justify-center gap-2 hover:bg-emerald-500 transition-all shadow-lg shadow-emerald-900/20">
+              <button onClick={() => { console.log('Clock In clicked'); clockIn(String(currentUser?.initials || '')); }} className="w-full bg-emerald-600 text-white rounded-lg py-2 text-xs font-bold flex items-center justify-center gap-2 hover:bg-emerald-500 transition-all shadow-lg shadow-emerald-900/20">
                 <Clock size={14}/> START SHIFT
               </button>
             )}
@@ -257,7 +257,7 @@ const Layout: React.FC<LayoutProps> = () => {
                 <Power size={16}/>
               </button>
             ) : (
-              <button onClick={() => { console.log('Clock In clicked'); clockIn(currentUser?.initials || ''); }} className="w-9 h-9 rounded-lg bg-emerald-600 text-white flex items-center justify-center hover:bg-emerald-500 transition-colors" title="Clock In">
+              <button onClick={() => { console.log('Clock In clicked'); clockIn(String(currentUser?.initials || '')); }} className="w-9 h-9 rounded-lg bg-emerald-600 text-white flex items-center justify-center hover:bg-emerald-500 transition-colors" title="Clock In">
                 <Clock size={16}/>
               </button>
             )}
@@ -354,10 +354,9 @@ const Layout: React.FC<LayoutProps> = () => {
           <Outlet context={{ isSidebarCollapsed }} />
         </div>
       </main>
-      {/* <GlobalBugReporter /> */}
+      <GlobalBugReporter />
     </div>
   );
 };
 
 export default Layout;
-

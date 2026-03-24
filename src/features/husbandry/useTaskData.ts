@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { coreDB as db } from '../../lib/DatabaseCore';
+import { coreDB, bootCoreDatabase } from '../../lib/DatabaseCore';
 import { Task, User, UserRole, Animal } from '../../types';
 
 const mockUsers: User[] = [
@@ -13,25 +13,45 @@ export const useTaskData = () => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (!db) return;
+    let isMounted = true;
+    let subs: { unsubscribe: () => void }[] = [];
 
-    const subs = [
-      db.tasks.find({
-        selector: { is_deleted: { $eq: false } },
-        sort: [{ due_date: 'asc' }]
-      }).$.subscribe(docs => {
-        setTasks(docs.map(d => d.toJSON() as Task));
-      }),
+    const loadData = async () => {
+      try {
+        const db = coreDB || await bootCoreDatabase();
+        if (!isMounted) return;
 
-      db.animals.find({
-        selector: { is_deleted: { $eq: false } }
-      }).$.subscribe(docs => {
-        setAnimals(docs.map(d => d.toJSON() as Animal));
-        setIsLoading(false);
-      })
-    ];
+        const tasksSub = db.tasks.find({
+          selector: { is_deleted: { $eq: false } },
+          sort: [{ due_date: 'asc' }]
+        }).$.subscribe(docs => {
+          if (isMounted) {
+            setTasks(docs.map(d => d.toJSON() as Task));
+          }
+        });
 
-    return () => subs.forEach(sub => sub.unsubscribe());
+        const animalsSub = db.animals.find({
+          selector: { is_deleted: { $eq: false } }
+        }).$.subscribe(docs => {
+          if (isMounted) {
+            setAnimals(docs.map(d => d.toJSON() as Animal));
+            setIsLoading(false);
+          }
+        });
+
+        subs = [tasksSub, animalsSub];
+      } catch (err) {
+        console.error('Failed to load task data:', err);
+        if (isMounted) setIsLoading(false);
+      }
+    };
+
+    loadData();
+
+    return () => {
+      isMounted = false;
+      subs.forEach(sub => sub.unsubscribe());
+    };
   }, []);
 
   const [filter, setFilter] = useState<'assigned' | 'pending' | 'completed'>('pending');
@@ -62,6 +82,7 @@ export const useTaskData = () => {
   }, [tasks, filter, searchTerm, currentUser.id, animals]);
 
   const addTask = async (newTask: Omit<Task, 'id'>) => {
+    const db = coreDB || await bootCoreDatabase();
     const taskWithId = { 
       ...newTask, 
       id: crypto.randomUUID(),
@@ -72,6 +93,7 @@ export const useTaskData = () => {
   };
 
   const updateTask = async (id: string, updates: Partial<Task>) => {
+    const db = coreDB || await bootCoreDatabase();
     const taskDoc = await db.tasks.findOne(id).exec();
     if (taskDoc) {
       const task = taskDoc.toJSON();
@@ -84,6 +106,7 @@ export const useTaskData = () => {
   };
 
   const deleteTask = async (id: string) => {
+    const db = coreDB || await bootCoreDatabase();
     const taskDoc = await db.tasks.findOne(id).exec();
     if (taskDoc) {
       const task = taskDoc.toJSON();
@@ -96,6 +119,7 @@ export const useTaskData = () => {
   };
 
   const toggleTaskCompletion = async (task: Task) => {
+    const db = coreDB || await bootCoreDatabase();
     await db.tasks.upsert({ 
       ...task, 
       completed: !task.completed,

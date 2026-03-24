@@ -2,7 +2,7 @@ import React from 'react';
 import { Animal, LogType, LogEntry, ClinicalNote } from '../../types';
 import HusbandryEntryModal from '../husbandry/AddEntryModal';
 import { AddClinicalNoteModal } from '../medical/AddClinicalNoteModal';
-import { coreDB as db } from '../../lib/DatabaseCore';
+import { coreDB, bootCoreDatabase } from '../../lib/DatabaseCore';
 
 interface AddEntryModalProps {
   isOpen: boolean;
@@ -25,6 +25,7 @@ const AddEntryModal: React.FC<AddEntryModalProps> = ({
 
   const handleHusbandrySave = async (entry: Partial<LogEntry>) => {
     try {
+      const db = coreDB || await bootCoreDatabase();
       await db.daily_records.upsert({
         ...entry,
         record_type: 'daily_logs_v2',
@@ -37,6 +38,7 @@ const AddEntryModal: React.FC<AddEntryModalProps> = ({
 
   const handleMedicalSave = async (note: Partial<ClinicalNote>) => {
     try {
+      const db = coreDB || await bootCoreDatabase();
       // Ensure animal_name is present for medical logs if required by the type
       const noteWithMetadata = {
         ...note,

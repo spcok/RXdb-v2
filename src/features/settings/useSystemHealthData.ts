@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { coreDB as rxdb } from '../../lib/DatabaseCore';
+import { coreDB, bootCoreDatabase } from '../../lib/DatabaseCore';
 import { supabase } from '../../lib/supabase';
 
 export function useSystemHealthData() {
@@ -124,18 +124,21 @@ export function useSystemHealthData() {
   });
 
   useEffect(() => {
-    if (!rxdb) return;
+    let isMounted = true;
 
     const updateCounts = async () => {
       try {
+        const db = coreDB || await bootCoreDatabase();
+        if (!isMounted) return;
+
         const counts = {
-          animals: await rxdb.animals.find().exec().then(docs => docs.length),
-          users: await rxdb.admin_records.find({ selector: { record_type: 'user' } }).exec().then(docs => docs.length),
-          daily_logs: await rxdb.daily_records.find({ selector: { record_type: 'daily_logs_v2' } }).exec().then(docs => docs.length),
-          tasks: await rxdb.tasks.find().exec().then(docs => docs.length),
-          medical_logs: await rxdb.clinical_records.find({ selector: { record_type: 'medical_logs' } }).exec().then(docs => docs.length)
+          animals: await db.animals.find().exec().then(docs => docs.length),
+          users: await db.admin_records.find({ selector: { record_type: 'user' } }).exec().then(docs => docs.length),
+          daily_logs: await db.daily_records.find({ selector: { record_type: 'daily_logs_v2' } }).exec().then(docs => docs.length),
+          tasks: await db.tasks.find().exec().then(docs => docs.length),
+          medical_logs: await db.clinical_records.find({ selector: { record_type: 'medical_logs' } }).exec().then(docs => docs.length)
         };
-        setTableCounts(counts);
+        if (isMounted) setTableCounts(counts);
       } catch (e) {
         console.error('Failed to update counts', e);
       }
@@ -143,7 +146,10 @@ export function useSystemHealthData() {
 
     updateCounts();
     const interval = setInterval(updateCounts, 10000); // Update every 10s
-    return () => clearInterval(interval);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
   }, []);
 
   const executeForceRebuild = async () => {
@@ -186,6 +192,7 @@ export function useSystemHealthData() {
     ];
 
     try {
+      const db = coreDB || await bootCoreDatabase();
       for (let i = 0; i < tablesToWipe.length; i++) {
         const table = tablesToWipe[i];
         
@@ -193,8 +200,8 @@ export function useSystemHealthData() {
         await supabase.from(table).delete().not('id', 'is', null);
         
         // Wipe Local RxDB Cache
-        if (rxdb && rxdb.collections[table]) {
-          await rxdb.collections[table].find().remove();
+        if (db && db.collections[table]) {
+          await db.collections[table].find().remove();
         }
 
         setWipeProgress(Math.round(((i + 1) / tablesToWipe.length) * 100));

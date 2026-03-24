@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { coreDB as db } from '../../lib/DatabaseCore';
+import { coreDB, bootCoreDatabase } from '../../lib/DatabaseCore';
 import { Timesheet, TimesheetStatus } from '../../types';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -8,24 +8,42 @@ export function useTimesheetData() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (!db) return;
+    let isMounted = true;
+    let sub: { unsubscribe: () => void } | null = null;
 
-    const sub = db.staff_records.find({
-      selector: { 
-        is_deleted: { $eq: false },
-        record_type: { $eq: 'timesheets' }
-      },
-      sort: [{ date: 'desc' }]
-    }).$.subscribe(docs => {
-      setTimesheets(docs.map(d => d.toJSON() as Timesheet));
-      setIsLoading(false);
-    });
+    const loadData = async () => {
+      try {
+        const db = coreDB || await bootCoreDatabase();
+        if (!isMounted) return;
 
-    return () => sub.unsubscribe();
+        sub = db.staff_records.find({
+          selector: { 
+            is_deleted: { $eq: false },
+            record_type: { $eq: 'timesheets' }
+          },
+          sort: [{ date: 'desc' }]
+        }).$.subscribe(docs => {
+          if (isMounted) {
+            setTimesheets(docs.map(d => d.toJSON() as Timesheet));
+            setIsLoading(false);
+          }
+        });
+      } catch (err) {
+        console.error('Failed to load timesheet data:', err);
+        if (isMounted) setIsLoading(false);
+      }
+    };
+
+    loadData();
+
+    return () => {
+      isMounted = false;
+      if (sub) sub.unsubscribe();
+    };
   }, []);
 
   const clockIn = async (staff_name: string) => {
-    if (!db) throw new Error('Database not initialized');
+    const db = coreDB || await bootCoreDatabase();
     const newTimesheet: Timesheet = {
       id: uuidv4(),
       record_type: 'timesheets',
@@ -40,7 +58,7 @@ export function useTimesheetData() {
   };
 
   const clockOut = async (id: string) => {
-    if (!db) throw new Error('Database not initialized');
+    const db = coreDB || await bootCoreDatabase();
     const timesheetDoc = await db.staff_records.findOne(id).exec();
     if (timesheetDoc) {
       const timesheet = timesheetDoc.toJSON();
@@ -55,7 +73,7 @@ export function useTimesheetData() {
   };
 
   const getCurrentlyClockedInStaff = async () => {
-    if (!db) return [];
+    const db = coreDB || await bootCoreDatabase();
     const active = await db.staff_records.find({
       selector: { 
         status: { $eq: TimesheetStatus.ACTIVE },
@@ -67,7 +85,7 @@ export function useTimesheetData() {
   };
 
   const addTimesheet = async (timesheet: Omit<Timesheet, 'id'>) => {
-    if (!db) throw new Error('Database not initialized');
+    const db = coreDB || await bootCoreDatabase();
     const newTimesheet: Timesheet = {
       ...timesheet,
       id: uuidv4(),
@@ -79,7 +97,7 @@ export function useTimesheetData() {
   };
 
   const deleteTimesheet = async (id: string) => {
-    if (!db) throw new Error('Database not initialized');
+    const db = coreDB || await bootCoreDatabase();
     const timesheetDoc = await db.staff_records.findOne(id).exec();
     if (timesheetDoc) {
       const timesheet = timesheetDoc.toJSON();

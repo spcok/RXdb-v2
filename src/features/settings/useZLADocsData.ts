@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { coreDB as db } from '../../lib/DatabaseCore';
+import { coreDB, bootCoreDatabase } from '../../lib/DatabaseCore';
 import { ZLADocument } from '../../types';
 
 export function useZLADocsData() {
@@ -8,22 +8,41 @@ export function useZLADocsData() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (!db) return;
+    let isMounted = true;
+    let sub: { unsubscribe: () => void } | null = null;
 
-    const sub = db.admin_records.find({
-      selector: {
-        record_type: 'zla_document',
-        is_deleted: { $eq: false }
+    const loadDocs = async () => {
+      try {
+        const db = coreDB || await bootCoreDatabase();
+        if (!isMounted) return;
+
+        sub = db.admin_records.find({
+          selector: {
+            record_type: 'zla_document',
+            is_deleted: { $eq: false }
+          }
+        }).$.subscribe(docs => {
+          if (isMounted) {
+            setDocuments(docs.map(d => d.toJSON() as ZLADocument));
+            setIsLoading(false);
+          }
+        });
+      } catch (err) {
+        console.error('Failed to load ZLA docs data:', err);
+        if (isMounted) setIsLoading(false);
       }
-    }).$.subscribe(docs => {
-      setDocuments(docs.map(d => d.toJSON() as ZLADocument));
-      setIsLoading(false);
-    });
+    };
 
-    return () => sub.unsubscribe();
+    loadDocs();
+
+    return () => {
+      isMounted = false;
+      if (sub) sub.unsubscribe();
+    };
   }, []);
 
   const addDocument = async (doc: Omit<ZLADocument, 'id'>) => {
+    const db = coreDB || await bootCoreDatabase();
     const id = uuidv4();
     const newDoc = {
       ...doc,
@@ -40,6 +59,7 @@ export function useZLADocsData() {
   };
 
   const deleteDocument = async (id: string) => {
+    const db = coreDB || await bootCoreDatabase();
     try {
       const doc = await db.admin_records.findOne(id).exec();
       if (doc) {

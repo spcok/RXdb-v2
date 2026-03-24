@@ -6,7 +6,7 @@ import { useAnimalForm } from './useAnimalForm';
 import { getAnimalIntelligence } from '../../services/geminiService';
 import { convertToGrams, convertFromGrams } from '../../services/weightUtils';
 import { Subscription } from 'rxjs';
-import { coreDB as db } from '../../lib/DatabaseCore';
+import { coreDB, bootCoreDatabase } from '../../lib/DatabaseCore';
 import { useOperationalLists } from '../../hooks/useOperationalLists';
 import Cropper from 'react-easy-crop';
 import { getCroppedImg } from '../../utils/cropImage';
@@ -44,32 +44,49 @@ const AnimalFormModal: React.FC<AnimalFormModalProps> = ({ isOpen, onClose, init
   const [linkedChildrenCount, setLinkedChildrenCount] = useState(0);
 
   useEffect(() => {
-    if (!db) return;
-
-    const parentMobsSub = db.animals.find({
-      selector: {
-        entity_type: EntityType.GROUP,
-        id: { $ne: initialData?.id || '' },
-        is_deleted: { $eq: false }
-      }
-    }).$.subscribe(docs => {
-      setParentMobs(docs.map(d => d.toJSON() as Animal));
-    });
-
+    let isMounted = true;
+    let parentMobsSub: Subscription;
     let linkedChildrenSub: Subscription;
-    if (initialData?.id) {
-      linkedChildrenSub = db.animals.find({
-        selector: {
-          parent_mob_id: initialData.id,
-          is_deleted: { $eq: false }
+
+    const loadData = async () => {
+      try {
+        const db = coreDB || await bootCoreDatabase();
+        if (!isMounted) return;
+
+        parentMobsSub = db.animals.find({
+          selector: {
+            entity_type: EntityType.GROUP,
+            id: { $ne: initialData?.id || '' },
+            is_deleted: { $eq: false }
+          }
+        }).$.subscribe(docs => {
+          if (isMounted) {
+            setParentMobs(docs.map(d => d.toJSON() as Animal));
+          }
+        });
+
+        if (initialData?.id) {
+          linkedChildrenSub = db.animals.find({
+            selector: {
+              parent_mob_id: initialData.id,
+              is_deleted: { $eq: false }
+            }
+          }).$.subscribe(docs => {
+            if (isMounted) {
+              setLinkedChildrenCount(docs.length);
+            }
+          });
         }
-      }).$.subscribe(docs => {
-        setLinkedChildrenCount(docs.length);
-      });
-    }
+      } catch (error) {
+        console.error('Failed to load modal data:', error);
+      }
+    };
+
+    loadData();
 
     return () => {
-      parentMobsSub.unsubscribe();
+      isMounted = false;
+      if (parentMobsSub) parentMobsSub.unsubscribe();
       if (linkedChildrenSub) linkedChildrenSub.unsubscribe();
     };
   }, [initialData?.id]);
@@ -172,6 +189,7 @@ const AnimalFormModal: React.FC<AnimalFormModalProps> = ({ isOpen, onClose, init
       weight_unit: weightUnit === 'lb' ? 'lbs_oz' : weightUnit
     };
     try {
+      const db = coreDB || await bootCoreDatabase();
       if (initialData) {
         if (initialData.location !== payload.location && initialData.location !== 'Main Aviary') {
           const internalMovement: InternalMovement = {
@@ -182,7 +200,7 @@ const AnimalFormModal: React.FC<AnimalFormModalProps> = ({ isOpen, onClose, init
             movement_type: MovementType.TRANSFER,
             source_location: initialData.location || 'Unknown',
             destination_location: payload.location,
-            created_by: currentUser?.initials || 'SYSTEM',
+            created_by: String(currentUser?.initials || 'SYSTEM'),
             notes: 'Auto-generated from profile location update.'
           };
           await db.logistics_records.upsert({
@@ -217,6 +235,7 @@ const AnimalFormModal: React.FC<AnimalFormModalProps> = ({ isOpen, onClose, init
     }
     
     try {
+      const db = coreDB || await bootCoreDatabase();
       const animalData: Animal = {
         ...initialData,
         ...payload,

@@ -6,7 +6,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { uploadFile } from '../../lib/storageEngine';
 import { Animal, AnimalCategory, HazardRating, ConservationStatus, EntityType } from '../../types';
 import { batchGetSpeciesData } from '../../services/geminiService';
-import { coreDB as db } from '../../lib/DatabaseCore';
+import { coreDB, bootCoreDatabase } from '../../lib/DatabaseCore';
 
 export const animalFormSchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -181,8 +181,8 @@ export function useAnimalForm({ initialData, onClose }: UseAnimalFormProps) {
   };
 
   const onSubmit = async (data: AnimalFormData) => {
-    if (!db) return;
     try {
+      const db = coreDB || await bootCoreDatabase();
       // Sanitization pass: Remove NaN values that might have slipped through
       const sanitizedPayload = { ...data };
       (Object.keys(sanitizedPayload) as Array<keyof AnimalFormData>).forEach(key => {

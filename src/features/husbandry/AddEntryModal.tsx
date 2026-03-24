@@ -4,7 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { X, Save, Loader2, Plus, Trash2 } from 'lucide-react';
 import { Animal, LogType, LogEntry, AnimalCategory } from '../../types';
 import { getMaidstoneDailyWeather } from '../../services/weatherService';
-import { coreDB as db } from '../../lib/DatabaseCore';
+import { coreDB, bootCoreDatabase } from '../../lib/DatabaseCore';
 import { useOperationalLists } from '../../hooks/useOperationalLists';
 import { convertToGrams, convertFromGrams } from '../../services/weightUtils';
 
@@ -139,7 +139,7 @@ const AddEntryModal: React.FC<AddEntryModalProps> = ({
     setError(null);
     
     if (!date) return setError('Date is required.');
-    if (!userInitials || userInitials.trim().length < 2) return setError('Staff initials are required (min 2 characters).');
+    if (!userInitials || String(userInitials).trim().length < 2) return setError('Staff initials are required (min 2 characters).');
     if (!animal?.id) return setError('Animal ID is missing.');
 
     if (logType === LogType.FEED && feedItems.some(item => !item.type || !item.quantity)) {
@@ -176,7 +176,7 @@ const AddEntryModal: React.FC<AddEntryModalProps> = ({
         log_type: logType,
         log_date: date,
         value: finalValue,
-        user_initials: userInitials.toUpperCase(),
+        user_initials: String(userInitials).toUpperCase(),
         notes: logType === LogType.FEED ? JSON.stringify({ cast, feedTime, userNotes: notes }) : notes,
       };
 
@@ -209,6 +209,7 @@ const AddEntryModal: React.FC<AddEntryModalProps> = ({
       if (logType === LogType.BIRTH) {
         entry.value = `Litter Size: ${litterSize} (${litterHealth})`;
         if (!existingLog && typeof litterSize === 'number' && litterSize > 0) {
+          const db = coreDB || await bootCoreDatabase();
           const pups = Array.from({ length: litterSize }).map((_, i) => ({
             id: uuidv4(),
             name: `Pup ${i + 1} (${animal.name})`,
@@ -469,7 +470,7 @@ const AddEntryModal: React.FC<AddEntryModalProps> = ({
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">
               Staff Initials <span className="text-red-500">*</span>
             </label>
-            <input type="text" value={userInitials} onChange={e => setUserInitials(e.target.value)} className="w-full p-3 bg-slate-50 border-2 border-slate-200 rounded-xl focus:border-red-500 focus:ring-0 transition-all font-bold text-xs" placeholder="e.g. JD" required minLength={2} />
+            <input type="text" value={String(userInitials || '')} onChange={e => setUserInitials(e.target.value)} className="w-full p-3 bg-slate-50 border-2 border-slate-200 rounded-xl focus:border-red-500 focus:ring-0 transition-all font-bold text-xs" placeholder="e.g. JD" required minLength={2} />
           </div>
 
           {renderFields()}

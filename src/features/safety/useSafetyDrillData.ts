@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { coreDB as db } from '../../lib/DatabaseCore';
+import { coreDB, bootCoreDatabase } from '../../lib/DatabaseCore';
 import { SafetyDrill } from '../../types';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -8,20 +8,39 @@ export function useSafetyDrillData() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (!db) return;
+    let isMounted = true;
+    let sub: { unsubscribe: () => void } | null = null;
 
-    const sub = db.safety_drills.find({
-      selector: { is_deleted: { $eq: false } },
-      sort: [{ date: 'desc' }]
-    }).$.subscribe(docs => {
-      setDrills(docs.map(d => d.toJSON() as SafetyDrill));
-      setIsLoading(false);
-    });
+    const loadData = async () => {
+      try {
+        const db = coreDB || await bootCoreDatabase();
+        if (!isMounted) return;
 
-    return () => sub.unsubscribe();
+        sub = db.safety_drills.find({
+          selector: { is_deleted: { $eq: false } },
+          sort: [{ date: 'desc' }]
+        }).$.subscribe(docs => {
+          if (isMounted) {
+            setDrills(docs.map(d => d.toJSON() as SafetyDrill));
+            setIsLoading(false);
+          }
+        });
+      } catch (err) {
+        console.error('Failed to load safety drill data:', err);
+        if (isMounted) setIsLoading(false);
+      }
+    };
+
+    loadData();
+
+    return () => {
+      isMounted = false;
+      if (sub) sub.unsubscribe();
+    };
   }, []);
 
   const addDrillLog = async (drill: Omit<SafetyDrill, 'id'>) => {
+    const db = coreDB || await bootCoreDatabase();
     const newDrill: SafetyDrill = {
       ...drill,
       id: uuidv4(),
@@ -32,6 +51,7 @@ export function useSafetyDrillData() {
   };
 
   const deleteDrillLog = async (id: string) => {
+    const db = coreDB || await bootCoreDatabase();
     const drillDoc = await db.safety_drills.findOne(id).exec();
     if (drillDoc) {
       const drill = drillDoc.toJSON();

@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState, useEffect } from 'react';
 import { LogEntry, LogType } from '../../types';
-import { coreDB as db } from '../../lib/DatabaseCore';
+import { coreDB, bootCoreDatabase } from '../../lib/DatabaseCore';
 import { useAnimalsData } from '../animals/useAnimalsData';
 
 export const useDailyLogData = (viewDate: string, activeCategory: string) => {
@@ -9,20 +9,38 @@ export const useDailyLogData = (viewDate: string, activeCategory: string) => {
   const [isLogsLoading, setIsLogsLoading] = useState(true);
 
   useEffect(() => {
-    if (!db) return;
+    let isMounted = true;
+    let sub: { unsubscribe: () => void } | null = null;
 
-    const sub = db.daily_records.find({
-      selector: { 
-        log_date: { $eq: viewDate },
-        is_deleted: { $eq: false },
-        record_type: { $eq: 'daily_logs_v2' }
+    const loadLogs = async () => {
+      try {
+        const db = coreDB || await bootCoreDatabase();
+        if (!isMounted) return;
+
+        sub = db.daily_records.find({
+          selector: { 
+            log_date: { $eq: viewDate },
+            is_deleted: { $eq: false },
+            record_type: { $eq: 'daily_logs_v2' }
+          }
+        }).$.subscribe(docs => {
+          if (isMounted) {
+            setAllLogs(docs.map(d => d.toJSON() as LogEntry));
+            setIsLogsLoading(false);
+          }
+        });
+      } catch (err) {
+        console.error('Failed to load daily logs:', err);
+        if (isMounted) setIsLogsLoading(false);
       }
-    }).$.subscribe(docs => {
-      setAllLogs(docs.map(d => d.toJSON() as LogEntry));
-      setIsLogsLoading(false);
-    });
+    };
 
-    return () => sub.unsubscribe();
+    loadLogs();
+
+    return () => {
+      isMounted = false;
+      if (sub) sub.unsubscribe();
+    };
   }, [viewDate]);
 
   const logs = useMemo(() => allLogs, [allLogs]);
@@ -32,6 +50,7 @@ export const useDailyLogData = (viewDate: string, activeCategory: string) => {
   }, [logs]);
 
   const addLogEntry = useCallback(async (entry: Partial<LogEntry>) => {
+    const db = coreDB || await bootCoreDatabase();
     const payload = {
       ...entry,
       id: entry.id || crypto.randomUUID(),

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { coreDB as db } from '../../lib/DatabaseCore';
+import { coreDB, bootCoreDatabase } from '../../lib/DatabaseCore';
 import { FirstAidLog } from '../../types';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -8,20 +8,39 @@ export function useFirstAidData() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (!db) return;
+    let isMounted = true;
+    let sub: { unsubscribe: () => void } | null = null;
 
-    const sub = db.first_aid_logs.find({
-      selector: { is_deleted: { $eq: false } },
-      sort: [{ date: 'desc' }]
-    }).$.subscribe(docs => {
-      setLogs(docs.map(d => d.toJSON() as FirstAidLog));
-      setIsLoading(false);
-    });
+    const loadData = async () => {
+      try {
+        const db = coreDB || await bootCoreDatabase();
+        if (!isMounted) return;
 
-    return () => sub.unsubscribe();
+        sub = db.first_aid_logs.find({
+          selector: { is_deleted: { $eq: false } },
+          sort: [{ date: 'desc' }]
+        }).$.subscribe(docs => {
+          if (isMounted) {
+            setLogs(docs.map(d => d.toJSON() as FirstAidLog));
+            setIsLoading(false);
+          }
+        });
+      } catch (err) {
+        console.error('Failed to load first aid data:', err);
+        if (isMounted) setIsLoading(false);
+      }
+    };
+
+    loadData();
+
+    return () => {
+      isMounted = false;
+      if (sub) sub.unsubscribe();
+    };
   }, []);
 
   const addFirstAid = async (log: Omit<FirstAidLog, 'id'>) => {
+    const db = coreDB || await bootCoreDatabase();
     const newLog: FirstAidLog = {
       ...log,
       id: uuidv4(),
@@ -32,6 +51,7 @@ export function useFirstAidData() {
   };
 
   const deleteFirstAid = async (id: string) => {
+    const db = coreDB || await bootCoreDatabase();
     const logDoc = await db.first_aid_logs.findOne(id).exec();
     if (logDoc) {
       const log = logDoc.toJSON();

@@ -46,7 +46,7 @@ export default function App() {
   // 1. Initialize Real Authentication
   useEffect(() => {
     let cleanup: () => void;
-    initialize().then((c: any) => {
+    initialize().then((c: (() => void) | void) => {
       if (typeof c === 'function') cleanup = c;
     });
     return () => { if (cleanup) cleanup(); };

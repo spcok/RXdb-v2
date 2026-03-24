@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { coreDB as db } from '../../lib/DatabaseCore';
+import { coreDB, bootCoreDatabase } from '../../lib/DatabaseCore';
 import { Contact } from '../../types';
 
 export function useDirectoryData() {
@@ -8,22 +8,41 @@ export function useDirectoryData() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (!db) return;
+    let isMounted = true;
+    let sub: { unsubscribe: () => void } | null = null;
 
-    const sub = db.admin_records.find({
-      selector: {
-        record_type: 'contact',
-        is_deleted: { $eq: false }
+    const loadContacts = async () => {
+      try {
+        const db = coreDB || await bootCoreDatabase();
+        if (!isMounted) return;
+
+        sub = db.admin_records.find({
+          selector: {
+            record_type: 'contact',
+            is_deleted: { $eq: false }
+          }
+        }).$.subscribe(docs => {
+          if (isMounted) {
+            setContacts(docs.map(d => d.toJSON() as Contact));
+            setIsLoading(false);
+          }
+        });
+      } catch (err) {
+        console.error('Failed to load directory data:', err);
+        if (isMounted) setIsLoading(false);
       }
-    }).$.subscribe(docs => {
-      setContacts(docs.map(d => d.toJSON() as Contact));
-      setIsLoading(false);
-    });
+    };
 
-    return () => sub.unsubscribe();
+    loadContacts();
+
+    return () => {
+      isMounted = false;
+      if (sub) sub.unsubscribe();
+    };
   }, []);
 
   const addContact = async (contact: Omit<Contact, 'id'>) => {
+    const db = coreDB || await bootCoreDatabase();
     const id = uuidv4();
     const newContact = {
       ...contact,
@@ -40,6 +59,7 @@ export function useDirectoryData() {
   };
 
   const updateContact = async (contact: Contact) => {
+    const db = coreDB || await bootCoreDatabase();
     try {
       await db.admin_records.upsert({
         ...contact,
@@ -52,6 +72,7 @@ export function useDirectoryData() {
   };
 
   const deleteContact = async (id: string) => {
+    const db = coreDB || await bootCoreDatabase();
     try {
       const doc = await db.admin_records.findOne(id).exec();
       if (doc) {

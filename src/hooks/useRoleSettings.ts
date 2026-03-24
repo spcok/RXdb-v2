@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { coreDB as db } from '../lib/DatabaseCore';
+import { coreDB, bootCoreDatabase } from '../lib/DatabaseCore';
 import { UserRole, RolePermissionConfig } from '../types';
 
 const defaultPermissions: Omit<RolePermissionConfig, 'role'> = {
@@ -48,46 +48,73 @@ export const useRoleSettings = () => {
   const [roles, setRoles] = useState<RolePermissionConfig[]>([]);
 
   useEffect(() => {
-    if (!db) return;
+    let isMounted = true;
+    let sub: { unsubscribe: () => void } | null = null;
 
-    const sub = db.admin_records.find({
-      selector: {
-        record_type: 'role_permission',
-        is_deleted: { $eq: false }
+    const loadData = async () => {
+      try {
+        const db = coreDB || await bootCoreDatabase();
+        if (!isMounted) return;
+
+        sub = db.admin_records.find({
+          selector: {
+            record_type: 'role_permission',
+            is_deleted: { $eq: false }
+          }
+        }).$.subscribe(docs => {
+          if (isMounted) {
+            setRoles(docs.map(d => d.toJSON() as RolePermissionConfig));
+          }
+        });
+      } catch (err) {
+        console.error('Failed to load role settings:', err);
       }
-    }).$.subscribe(docs => {
-      setRoles(docs.map(d => d.toJSON() as RolePermissionConfig));
-    });
+    };
 
-    return () => sub.unsubscribe();
+    loadData();
+
+    return () => {
+      isMounted = false;
+      if (sub) sub.unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
-    if (roles.length > 0 && db) {
-      const existingRoles = roles.map(r => r.role);
-      const missingRoles = Object.values(UserRole).filter(role => !existingRoles.includes(role));
+    let isMounted = true;
+    const ensureRoles = async () => {
+      const db = coreDB || await bootCoreDatabase();
+      if (!isMounted) return;
 
-      missingRoles.forEach(async role => {
-        const newRoleConfig: RolePermissionConfig = {
-          role,
-          ...defaultPermissions,
-        };
-        try {
-          await db.admin_records.upsert({
-            ...newRoleConfig,
-            id: `role_${role}`,
-            record_type: 'role_permission',
-            is_deleted: false,
-            updated_at: new Date().toISOString()
-          });
-        } catch (err) {
-          console.error('Failed to create missing role:', err);
+      if (roles.length > 0) {
+        const existingRoles = roles.map(r => r.role);
+        const missingRoles = Object.values(UserRole).filter(role => !existingRoles.includes(role));
+
+        for (const role of missingRoles) {
+          const newRoleConfig: RolePermissionConfig = {
+            role,
+            ...defaultPermissions,
+          };
+          try {
+            await db.admin_records.upsert({
+              ...newRoleConfig,
+              id: `role_${role}`,
+              record_type: 'role_permission',
+              is_deleted: false,
+              updated_at: new Date().toISOString()
+            });
+          } catch (err) {
+            console.error('Failed to create missing role:', err);
+          }
         }
-      });
-    }
+      }
+    };
+
+    ensureRoles();
+    return () => { isMounted = false; };
   }, [roles]);
 
   const handlePermissionChange = async (role: UserRole, permissionKey: keyof RolePermissionConfig, newValue: boolean) => {
+    const db = coreDB || await bootCoreDatabase();
     const roleConfig = roles?.find(r => r.role === role);
     if (!roleConfig) return;
 
@@ -103,9 +130,8 @@ export const useRoleSettings = () => {
         record_type: 'role_permission',
         updated_at: new Date().toISOString()
       });
-    } catch (error) {
-      console.error('Failed to update permission:', error);
-      alert('Failed to update permission. Please try again.');
+    } catch (err) {
+      console.error('Failed to update permission:', err);
     }
   };
 

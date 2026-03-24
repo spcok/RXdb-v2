@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { coreDB as db } from '../../lib/DatabaseCore';
+import { coreDB, bootCoreDatabase } from '../../lib/DatabaseCore';
 import { Animal, Task } from '../../types';
 
 export function useFeedingScheduleData() {
@@ -8,27 +8,48 @@ export function useFeedingScheduleData() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (!db) return;
+    let isMounted = true;
+    let subs: { unsubscribe: () => void }[] = [];
 
-    const subs = [
-      db.animals.find({
-        selector: { is_deleted: { $eq: false } }
-      }).$.subscribe(docs => {
-        setAnimals(docs.map(d => d.toJSON() as Animal));
-      }),
+    const loadData = async () => {
+      try {
+        const db = coreDB || await bootCoreDatabase();
+        if (!isMounted) return;
 
-      db.tasks.find({
-        selector: { is_deleted: { $eq: false } }
-      }).$.subscribe(docs => {
-        setTasks(docs.map(d => d.toJSON() as Task));
-        setIsLoading(false);
-      })
-    ];
+        const animalsSub = db.animals.find({
+          selector: { is_deleted: { $eq: false } }
+        }).$.subscribe(docs => {
+          if (isMounted) {
+            setAnimals(docs.map(d => d.toJSON() as Animal));
+          }
+        });
 
-    return () => subs.forEach(sub => sub.unsubscribe());
+        const tasksSub = db.tasks.find({
+          selector: { is_deleted: { $eq: false } }
+        }).$.subscribe(docs => {
+          if (isMounted) {
+            setTasks(docs.map(d => d.toJSON() as Task));
+            setIsLoading(false);
+          }
+        });
+
+        subs = [animalsSub, tasksSub];
+      } catch (err) {
+        console.error('Failed to load feeding schedule data:', err);
+        if (isMounted) setIsLoading(false);
+      }
+    };
+
+    loadData();
+
+    return () => {
+      isMounted = false;
+      subs.forEach(sub => sub.unsubscribe());
+    };
   }, []);
 
   const addTasks = async (newTasks: Task[]) => {
+    const db = coreDB || await bootCoreDatabase();
     for (const task of newTasks) {
       await db.tasks.upsert({
         ...task,
@@ -39,6 +60,7 @@ export function useFeedingScheduleData() {
   };
 
   const deleteTask = async (id: string) => {
+    const db = coreDB || await bootCoreDatabase();
     const taskDoc = await db.tasks.findOne(id).exec();
     if (taskDoc) {
       const task = taskDoc.toJSON();

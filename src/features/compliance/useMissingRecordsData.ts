@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from 'react';
-import { coreDB as db } from '../../lib/DatabaseCore';
+import { coreDB, bootCoreDatabase } from '../../lib/DatabaseCore';
 import { LogType, Animal, LogEntry, ClinicalNote } from '../../types';
 
 export interface MissingRecordAlert {
@@ -38,32 +38,52 @@ export function useMissingRecordsData() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (!db) return;
+    let isMounted = true;
+    let subs: { unsubscribe: () => void }[] = [];
 
-    const subs = [
-      db.animals.find({ selector: { is_deleted: { $eq: false } } }).$.subscribe(docs => {
-        setAnimals(docs.map(d => d.toJSON() as Animal));
-      }),
-      db.daily_records.find({ 
-        selector: { 
-          is_deleted: { $eq: false },
-          record_type: { $eq: 'daily_logs_v2' }
-        } 
-      }).$.subscribe(docs => {
-        setDailyLogs(docs.map(d => d.toJSON() as LogEntry));
-      }),
-      db.clinical_records.find({ 
-        selector: { 
-          is_deleted: { $eq: false },
-          record_type: { $eq: 'medical_logs' }
-        } 
-      }).$.subscribe(docs => {
-        setMedicalLogs(docs.map(d => d.toJSON() as ClinicalNote));
-        setIsLoading(false);
-      })
-    ];
+    const loadData = async () => {
+      try {
+        const db = coreDB || await bootCoreDatabase();
+        if (!isMounted) return;
 
-    return () => subs.forEach(s => s.unsubscribe());
+        const animalsSub = db.animals.find({ selector: { is_deleted: { $eq: false } } }).$.subscribe(docs => {
+          if (isMounted) setAnimals(docs.map(d => d.toJSON() as Animal));
+        });
+
+        const dailyLogsSub = db.daily_records.find({ 
+          selector: { 
+            is_deleted: { $eq: false },
+            record_type: { $eq: 'daily_logs_v2' }
+          } 
+        }).$.subscribe(docs => {
+          if (isMounted) setDailyLogs(docs.map(d => d.toJSON() as LogEntry));
+        });
+
+        const medicalLogsSub = db.clinical_records.find({ 
+          selector: { 
+            is_deleted: { $eq: false },
+            record_type: { $eq: 'medical_logs' }
+          } 
+        }).$.subscribe(docs => {
+          if (isMounted) {
+            setMedicalLogs(docs.map(d => d.toJSON() as ClinicalNote));
+            setIsLoading(false);
+          }
+        });
+
+        subs = [animalsSub, dailyLogsSub, medicalLogsSub];
+      } catch (err) {
+        console.error('Failed to load missing records data:', err);
+        if (isMounted) setIsLoading(false);
+      }
+    };
+
+    loadData();
+
+    return () => {
+      isMounted = false;
+      subs.forEach(s => s.unsubscribe());
+    };
   }, []);
 
   const { alerts, complianceStats, categoryCompliance } = useMemo(() => {

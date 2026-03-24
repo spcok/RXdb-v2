@@ -55,19 +55,19 @@ const Settings: React.FC = () => {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700">Name</label>
-                <input type="text" defaultValue={currentUser.name} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" />
+                <input type="text" defaultValue={String(currentUser?.name || '')} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700">Initials</label>
-                <input type="text" defaultValue={currentUser.initials} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" />
+                <input type="text" defaultValue={String(currentUser?.initials || '')} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700">Role</label>
-                <input type="text" defaultValue={currentUser.role} disabled className="mt-1 block w-full rounded-md border-slate-300 bg-slate-50 shadow-sm" />
+                <input type="text" defaultValue={String(currentUser?.role || '')} disabled className="mt-1 block w-full rounded-md border-slate-300 bg-slate-50 shadow-sm" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700">Job Position</label>
-                <input type="text" defaultValue={currentUser.job_position} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" />
+                <input type="text" defaultValue={String(currentUser?.job_position || '')} className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" />
               </div>
             </div>
             <button className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">Save Changes</button>

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { coreDB as db } from '../../lib/DatabaseCore';
+import { coreDB, bootCoreDatabase } from '../../lib/DatabaseCore';
 import { Animal, ConservationStatus } from '../../types';
 import { batchGetSpeciesData } from '../../services/geminiService';
 
@@ -8,20 +8,39 @@ export function useIntelligenceData() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (!db) return;
+    let isMounted = true;
+    let sub: { unsubscribe: () => void } | null = null;
 
-    const sub = db.animals.find({
-      selector: { is_deleted: { $eq: false } }
-    }).$.subscribe(docs => {
-      setAnimals(docs.map(d => d.toJSON() as Animal));
-      setIsLoading(false);
-    });
+    const loadAnimals = async () => {
+      try {
+        const db = coreDB || await bootCoreDatabase();
+        if (!isMounted) return;
 
-    return () => sub.unsubscribe();
+        sub = db.animals.find({
+          selector: { is_deleted: { $eq: false } }
+        }).$.subscribe(docs => {
+          if (isMounted) {
+            setAnimals(docs.map(d => d.toJSON() as Animal));
+            setIsLoading(false);
+          }
+        });
+      } catch (err) {
+        console.error('Failed to load intelligence data:', err);
+        if (isMounted) setIsLoading(false);
+      }
+    };
+
+    loadAnimals();
+
+    return () => {
+      isMounted = false;
+      if (sub) sub.unsubscribe();
+    };
   }, []);
 
   const updateAnimal = async (animal: Animal) => {
     try {
+      const db = coreDB || await bootCoreDatabase();
       await db.animals.upsert({
         ...animal,
         updated_at: new Date().toISOString()

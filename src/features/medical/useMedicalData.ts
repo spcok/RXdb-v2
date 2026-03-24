@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { ClinicalNote, MARChart, QuarantineRecord, Animal } from '../../types';
-import { coreDB as db } from '../../lib/DatabaseCore';
+import { coreDB, bootCoreDatabase } from '../../lib/DatabaseCore';
 
 export function useMedicalData() {
   const [clinicalNotes, setClinicalNotes] = useState<ClinicalNote[]>([]);
@@ -10,45 +10,70 @@ export function useMedicalData() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (!db) return;
+    let isMounted = true;
+    let subs: { unsubscribe: () => void }[] = [];
 
-    const subs = [
-      db.clinical_records.find({
-        selector: { 
-          is_deleted: { $eq: false },
-          record_type: { $eq: 'medical_logs' }
-        },
-        sort: [{ date: 'desc' }]
-      }).$.subscribe(docs => setClinicalNotes(docs.map(d => d.toJSON() as ClinicalNote))),
+    const loadData = async () => {
+      try {
+        const db = coreDB || await bootCoreDatabase();
+        if (!isMounted) return;
 
-      db.clinical_records.find({
-        selector: { 
-          is_deleted: { $eq: false },
-          record_type: { $eq: 'mar_charts' }
-        },
-        sort: [{ start_date: 'desc' }]
-      }).$.subscribe(docs => setMarCharts(docs.map(d => d.toJSON() as MARChart))),
+        const clinicalSub = db.clinical_records.find({
+          selector: { 
+            is_deleted: { $eq: false },
+            record_type: { $eq: 'medical_logs' }
+          },
+          sort: [{ date: 'desc' }]
+        }).$.subscribe(docs => {
+          if (isMounted) setClinicalNotes(docs.map(d => d.toJSON() as ClinicalNote));
+        });
 
-      db.clinical_records.find({
-        selector: { 
-          is_deleted: { $eq: false },
-          record_type: { $eq: 'quarantine_records' }
-        },
-        sort: [{ start_date: 'desc' }]
-      }).$.subscribe(docs => setQuarantineRecords(docs.map(d => d.toJSON() as QuarantineRecord))),
+        const marSub = db.clinical_records.find({
+          selector: { 
+            is_deleted: { $eq: false },
+            record_type: { $eq: 'mar_charts' }
+          },
+          sort: [{ start_date: 'desc' }]
+        }).$.subscribe(docs => {
+          if (isMounted) setMarCharts(docs.map(d => d.toJSON() as MARChart));
+        });
 
-      db.animals.find({
-        selector: { is_deleted: { $eq: false } }
-      }).$.subscribe(docs => {
-        setAnimals(docs.map(d => d.toJSON() as Animal));
-        setIsLoading(false);
-      })
-    ];
+        const quarantineSub = db.clinical_records.find({
+          selector: { 
+            is_deleted: { $eq: false },
+            record_type: { $eq: 'quarantine_records' }
+          },
+          sort: [{ start_date: 'desc' }]
+        }).$.subscribe(docs => {
+          if (isMounted) setQuarantineRecords(docs.map(d => d.toJSON() as QuarantineRecord));
+        });
 
-    return () => subs.forEach(sub => sub.unsubscribe());
+        const animalsSub = db.animals.find({
+          selector: { is_deleted: { $eq: false } }
+        }).$.subscribe(docs => {
+          if (isMounted) {
+            setAnimals(docs.map(d => d.toJSON() as Animal));
+            setIsLoading(false);
+          }
+        });
+
+        subs = [clinicalSub, marSub, quarantineSub, animalsSub];
+      } catch (err) {
+        console.error('Failed to load medical data:', err);
+        if (isMounted) setIsLoading(false);
+      }
+    };
+
+    loadData();
+
+    return () => {
+      isMounted = false;
+      subs.forEach(sub => sub.unsubscribe());
+    };
   }, []);
 
   const addClinicalNote = async (note: Omit<ClinicalNote, 'id' | 'animal_name'>) => {
+    const db = coreDB || await bootCoreDatabase();
     const animalDoc = await db.animals.findOne(note.animal_id).exec();
     const newNote: ClinicalNote = {
       ...note,
@@ -62,6 +87,7 @@ export function useMedicalData() {
   };
 
   const updateClinicalNote = async (note: ClinicalNote) => {
+    const db = coreDB || await bootCoreDatabase();
     await db.clinical_records.upsert({
       ...note,
       record_type: 'medical_logs',
@@ -70,6 +96,7 @@ export function useMedicalData() {
   };
 
   const addMarChart = async (chart: Omit<MARChart, 'id' | 'animal_name' | 'administered_dates' | 'status'>) => {
+    const db = coreDB || await bootCoreDatabase();
     const animalDoc = await db.animals.findOne(chart.animal_id).exec();
     const newChart: MARChart = {
       ...chart,
@@ -85,6 +112,7 @@ export function useMedicalData() {
   };
 
   const updateMarChart = async (chart: MARChart) => {
+    const db = coreDB || await bootCoreDatabase();
     await db.clinical_records.upsert({
       ...chart,
       record_type: 'mar_charts',
@@ -93,6 +121,7 @@ export function useMedicalData() {
   };
 
   const signOffDose = async (chartId: string, dateIso: string) => {
+    const db = coreDB || await bootCoreDatabase();
     const chartDoc = await db.clinical_records.findOne(chartId).exec();
     if (chartDoc) {
       const chart = chartDoc.toJSON();
@@ -106,6 +135,7 @@ export function useMedicalData() {
   };
 
   const addQuarantineRecord = async (record: Omit<QuarantineRecord, 'id' | 'animal_name' | 'status'>) => {
+    const db = coreDB || await bootCoreDatabase();
     const animalDoc = await db.animals.findOne(record.animal_id).exec();
     const newRecord: QuarantineRecord = {
       ...record,
@@ -120,6 +150,7 @@ export function useMedicalData() {
   };
 
   const updateQuarantineRecord = async (record: QuarantineRecord) => {
+    const db = coreDB || await bootCoreDatabase();
     await db.clinical_records.upsert({
       ...record,
       record_type: 'quarantine_records',

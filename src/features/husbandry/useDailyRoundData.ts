@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { AnimalCategory, DailyRound, Animal, LogType, LogEntry, EntityType } from '../../types';
-import { coreDB as db } from '../../lib/DatabaseCore';
+import { coreDB, bootCoreDatabase } from '../../lib/DatabaseCore';
 import { v4 as uuidv4 } from 'uuid';
 
 interface AnimalCheckState {
@@ -26,34 +26,56 @@ export function useDailyRoundData(viewDate: string) {
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     useEffect(() => {
-        if (!db) return;
+        let isMounted = true;
+        let subs: { unsubscribe: () => void }[] = [];
 
-        const subs = [
-            db.animals.find({
-                selector: { is_deleted: { $eq: false } }
-            }).$.subscribe(docs => setAllAnimals(docs.map(d => d.toJSON() as Animal))),
+        const loadData = async () => {
+            try {
+                const db = coreDB || await bootCoreDatabase();
+                if (!isMounted) return;
 
-            db.daily_records.find({
-                selector: { 
-                    log_date: { $eq: viewDate },
-                    is_deleted: { $eq: false },
-                    record_type: { $eq: 'daily_logs_v2' }
-                }
-            }).$.subscribe(docs => setLiveLogs(docs.map(d => d.toJSON() as LogEntry))),
+                const animalsSub = db.animals.find({
+                    selector: { is_deleted: { $eq: false } }
+                }).$.subscribe(docs => {
+                    if (isMounted) setAllAnimals(docs.map(d => d.toJSON() as Animal));
+                });
 
-            db.daily_records.find({
-                selector: { 
-                    date: { $eq: viewDate },
-                    is_deleted: { $eq: false },
-                    record_type: { $eq: 'daily_rounds' }
-                }
-            }).$.subscribe(docs => {
-                setLiveRounds(docs.map(d => d.toJSON() as DailyRound));
-                setIsLoading(false);
-            })
-        ];
+                const dailyLogsSub = db.daily_records.find({
+                    selector: { 
+                        log_date: { $eq: viewDate },
+                        is_deleted: { $eq: false },
+                        record_type: { $eq: 'daily_logs_v2' }
+                    }
+                }).$.subscribe(docs => {
+                    if (isMounted) setLiveLogs(docs.map(d => d.toJSON() as LogEntry));
+                });
 
-        return () => subs.forEach(sub => sub.unsubscribe());
+                const dailyRoundsSub = db.daily_records.find({
+                    selector: { 
+                        date: { $eq: viewDate },
+                        is_deleted: { $eq: false },
+                        record_type: { $eq: 'daily_rounds' }
+                    }
+                }).$.subscribe(docs => {
+                    if (isMounted) {
+                        setLiveRounds(docs.map(d => d.toJSON() as DailyRound));
+                        setIsLoading(false);
+                    }
+                });
+
+                subs = [animalsSub, dailyLogsSub, dailyRoundsSub];
+            } catch (err) {
+                console.error('Failed to load daily round data:', err);
+                if (isMounted) setIsLoading(false);
+            }
+        };
+
+        loadData();
+
+        return () => {
+            isMounted = false;
+            subs.forEach(sub => sub.unsubscribe());
+        };
     }, [viewDate]);
 
     const currentRound = useMemo(() => {
@@ -210,6 +232,7 @@ export function useDailyRoundData(viewDate: string) {
         
         setIsSubmitting(true);
         try {
+            const db = coreDB || await bootCoreDatabase();
             const round: DailyRound = {
                 id: currentRoundId || uuidv4(),
                 record_type: 'daily_rounds',

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { coreDB as db } from '../../lib/DatabaseCore';
+import { coreDB, bootCoreDatabase } from '../../lib/DatabaseCore';
 import { Incident } from '../../types';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -10,17 +10,35 @@ export const useIncidentData = () => {
   const [filterSeverity, setFilterSeverity] = useState('ALL');
 
   useEffect(() => {
-    if (!db) return;
+    let isMounted = true;
+    let sub: { unsubscribe: () => void } | null = null;
 
-    const sub = db.incidents.find({
-      selector: { is_deleted: { $eq: false } },
-      sort: [{ date: 'desc' }]
-    }).$.subscribe(docs => {
-      setIncidents(docs.map(d => d.toJSON() as Incident));
-      setIsLoading(false);
-    });
+    const loadData = async () => {
+      try {
+        const db = coreDB || await bootCoreDatabase();
+        if (!isMounted) return;
 
-    return () => sub.unsubscribe();
+        sub = db.incidents.find({
+          selector: { is_deleted: { $eq: false } },
+          sort: [{ date: 'desc' }]
+        }).$.subscribe(docs => {
+          if (isMounted) {
+            setIncidents(docs.map(d => d.toJSON() as Incident));
+            setIsLoading(false);
+          }
+        });
+      } catch (err) {
+        console.error('Failed to load incident data:', err);
+        if (isMounted) setIsLoading(false);
+      }
+    };
+
+    loadData();
+
+    return () => {
+      isMounted = false;
+      if (sub) sub.unsubscribe();
+    };
   }, []);
 
   const filteredIncidents = incidents.filter(i => {
@@ -30,6 +48,7 @@ export const useIncidentData = () => {
   });
 
   const addIncident = async (incident: Omit<Incident, 'id'>) => {
+    const db = coreDB || await bootCoreDatabase();
     const newIncident: Incident = { 
       ...incident, 
       id: uuidv4(),
@@ -40,6 +59,7 @@ export const useIncidentData = () => {
   };
 
   const deleteIncident = async (id: string) => {
+    const db = coreDB || await bootCoreDatabase();
     const incidentDoc = await db.incidents.findOne(id).exec();
     if (incidentDoc) {
       const incident = incidentDoc.toJSON();

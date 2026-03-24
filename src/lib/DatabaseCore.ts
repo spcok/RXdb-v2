@@ -5,9 +5,9 @@ import { replicateSupabase, RxSupabaseReplicationState } from 'rxdb/plugins/repl
 // 🔥 THE IMMORTAL PATTERN
 // Attaches the promise to the global window. Survives HMR reloads, 
 // completely ignores React Strict Mode double-renders, and uses a static name.
-const GLOBALS = globalThis as any;
+const GLOBALS = globalThis as unknown as Record<string, unknown>;
 
-export let coreDB: RxDatabase | null = GLOBALS.__KOA_IMMORTAL_DB || null;
+export let coreDB: RxDatabase | null = (GLOBALS.__KOA_IMMORTAL_DB as RxDatabase) || null;
 
 const SYNC_MAP: Record<string, { table: string, type: string }[]> = {
   animals: [{ table: 'animals', type: 'animals' }, { table: 'archived_animals', type: 'archived_animals' }],
@@ -43,7 +43,7 @@ const taskKeys = ['animal_id', 'title', 'due_date', 'completed', 'assigned_to', 
 export const bootCoreDatabase = (): Promise<RxDatabase> => {
   // 1. If it's already booting or booted globally, return it immediately.
   if (GLOBALS.__KOA_IMMORTAL_PROMISE) {
-    return GLOBALS.__KOA_IMMORTAL_PROMISE;
+    return GLOBALS.__KOA_IMMORTAL_PROMISE as Promise<RxDatabase>;
   }
 
   console.log(`🛡️ [Core DB] Booting Immortal Engine...`);
@@ -78,7 +78,7 @@ export const bootCoreDatabase = (): Promise<RxDatabase> => {
     throw err;
   });
 
-  return GLOBALS.__KOA_IMMORTAL_PROMISE;
+  return GLOBALS.__KOA_IMMORTAL_PROMISE as Promise<RxDatabase>;
 };
 
 // 3. Neutralize the destroy function to prevent Strict Mode teardowns.
@@ -86,43 +86,40 @@ export const destroyCoreDatabase = async () => {
   console.log("🛑 [Core DB] Database destruction bypassed for stability.");
 };
 
-if (!GLOBALS.__koa_activeReplications) {
-    GLOBALS.__koa_activeReplications = [];
-}
-const activeReplications: RxSupabaseReplicationState<unknown>[] = GLOBALS.__koa_activeReplications;
+const activeReplications: RxSupabaseReplicationState<unknown>[] = (GLOBALS.__koa_activeReplications as RxSupabaseReplicationState<unknown>[]) || [];
 
 // 🛡️ The Supabase Payload Interceptor
 // Prevents missing/null IDs from reaching RxDB and causing 22P02 Postgres crashes
-const createSafeSupabaseClient = (client: any) => {
+const createSafeSupabaseClient = (client: { from: (table: string) => unknown }) => {
   return new Proxy(client, {
     get(target, prop) {
       if (prop === 'from') {
         return (table: string) => {
-          const queryObj = target.from(table);
+          const queryObj = target.from(table) as { select: (...args: unknown[]) => { then: (onFulfilled: (response: { data: unknown[] }) => unknown, onRejected: unknown) => unknown } };
           return new Proxy(queryObj, {
             get(qTarget, qProp) {
               if (qProp === 'select') {
-                return (...args: any[]) => {
+                return (...args: unknown[]) => {
                   const builder = qTarget.select(...args);
                   const originalThen = builder.then.bind(builder);
                   
-                  builder.then = (onFulfilled: any, onRejected: any) => {
-                    return originalThen((response: any) => {
-                      if (response?.data && Array.isArray(response.data)) {
-                        response.data = response.data.map((row: any) => {
-                          const cleanRow = { ...row };
-                          if (!cleanRow.id) cleanRow.id = crypto.randomUUID(); // Inject valid UUID
-                          return cleanRow;
-                        });
-                      }
-                      return onFulfilled ? onFulfilled(response) : response;
-                    }, onRejected);
-                  };
+          builder.then = (onFulfilled: (response: { data: unknown[] }) => unknown, onRejected: unknown) => {
+            return originalThen((response: { data: unknown[] }) => {
+              if (response?.data && Array.isArray(response.data)) {
+                response.data = response.data.map((row: unknown) => {
+                  const cleanRow = { ...(row as Record<string, unknown>) };
+                  if (!cleanRow.id) cleanRow.id = crypto.randomUUID(); // Inject valid UUID
+                  return cleanRow;
+                });
+              }
+              return (onFulfilled as (response: { data: unknown[] }) => unknown) ? (onFulfilled as (response: { data: unknown[] }) => unknown)(response) : response;
+            }, onRejected as (reason: unknown) => void);
+          };
                   return builder;
                 };
               }
               const value = qTarget[qProp as keyof typeof qTarget];
-              return typeof value === 'function' ? value.bind(qTarget) : value;
+              return typeof value === 'function' ? (value as (...args: unknown[]) => unknown).bind(qTarget) : value;
             }
           });
         };
@@ -132,12 +129,13 @@ const createSafeSupabaseClient = (client: any) => {
   });
 };
 
-export const startCoreSync = async (db: RxDatabase, realSupabaseClient: any) => {
+export const startCoreSync = async (db: RxDatabase, realSupabaseClient: { from: (table: string) => unknown }) => {
   if (!db || !realSupabaseClient) return;
 
   console.log('🔗 [Core DB] Engaging Official Authenticated Sync (Protected)...');
 
-  const safeSupabaseClient = createSafeSupabaseClient(realSupabaseClient);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const safeSupabaseClient = createSafeSupabaseClient(realSupabaseClient) as any;
 
   activeReplications.forEach(state => state.cancel());
   activeReplications.length = 0;
@@ -156,17 +154,17 @@ export const startCoreSync = async (db: RxDatabase, realSupabaseClient: any) => 
           deletedField: 'is_deleted',
           pull: { 
             batchSize: 100, 
-            modifier: (doc: any) => {
+            modifier: (doc: Record<string, unknown>) => {
               const cleanDoc = { ...doc };
               Object.keys(cleanDoc).forEach(key => {
                 if (cleanDoc[key] === null) delete cleanDoc[key];
               });
-              if (!cleanDoc.id) cleanDoc.id = cleanDoc.role || cleanDoc.name || cleanDoc.type || crypto.randomUUID();
+              if (!cleanDoc.id) cleanDoc.id = (cleanDoc.role as string) || (cleanDoc.name as string) || (cleanDoc.type as string) || crypto.randomUUID();
               return { ...cleanDoc, id: String(cleanDoc.id), record_type: config.type };
             } 
           },
           push: { 
-            modifier: (doc: any) => doc.record_type === config.type ? doc : null 
+            modifier: (doc: Record<string, unknown>) => doc.record_type === config.type ? doc : null 
           },
           live: true, 
           retryTime: 5000 
