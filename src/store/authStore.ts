@@ -9,7 +9,7 @@ interface AuthState {
   isUiLocked: boolean;
   setUiLocked: (locked: boolean) => void;
   initialize: () => Promise<void>;
-  login: (email: string, password: string) => Promise<void>; // 🚨 Restored Login Function
+  login: (email: string, password: string) => Promise<void>; 
   logout: () => Promise<void>;
 }
 
@@ -29,17 +29,24 @@ export const useAuthStore = create<AuthState>((set) => ({
       if (error) throw error;
 
       if (session) {
-        const { data: profile } = await supabase
+        const { data: profile, error: profileError } = await supabase
           .from('users')
           .select('*')
           .eq('id', session.user.id)
           .single();
 
-        set({ 
-          session, 
-          currentUser: profile || session.user, 
-          isLoading: false 
-        });
+        if (profileError && profileError.code !== 'PGRST116') {
+           console.warn('⚠️ [Auth] Profile fetch issue (RLS might be blocking):', profileError.message);
+        }
+
+        const userData = profile || {
+          ...session.user,
+          role: session.user.user_metadata?.role || 'GUEST'
+        };
+
+        console.log(`👤 [Auth] Boot Resolved Role: ${userData.role}`);
+
+        set({ session, currentUser: userData, isLoading: false });
       } else {
         set({ session: null, currentUser: null, isLoading: false });
       }
@@ -52,11 +59,14 @@ export const useAuthStore = create<AuthState>((set) => ({
             .eq('id', newSession.user.id)
             .single();
             
-          set({ 
-            session: newSession, 
-            currentUser: profile || newSession.user, 
-            isLoading: false 
-          });
+          const userData = profile || {
+            ...newSession.user,
+            role: newSession.user.user_metadata?.role || 'GUEST'
+          };
+
+          console.log(`👤 [Auth] Login Resolved Role: ${userData.role}`);
+
+          set({ session: newSession, currentUser: userData, isLoading: false });
         } else {
           set({ session: null, currentUser: null, isLoading: false });
         }
@@ -68,12 +78,10 @@ export const useAuthStore = create<AuthState>((set) => ({
     }
   },
 
-  // 🚨 Restored the missing login function so the LoginScreen doesn't crash
   login: async (email, password) => {
     console.log('🔑 [Auth] Attempting Login...');
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
-    // The onAuthStateChange listener will automatically catch this and update the state
   },
 
   logout: async () => {

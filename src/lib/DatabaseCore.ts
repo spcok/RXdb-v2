@@ -2,8 +2,12 @@ import { createRxDatabase, RxDatabase } from 'rxdb';
 import { getRxStorageDexie } from 'rxdb/plugins/storage-dexie';
 import { replicateSupabase, RxSupabaseReplicationState } from 'rxdb/plugins/replication-supabase';
 
-const globalSandbox = globalThis as any;
-export let coreDB: RxDatabase = globalSandbox.__koa_coreDB || null;
+// 🔥 THE IMMORTAL PATTERN
+// Attaches the promise to the global window. Survives HMR reloads, 
+// completely ignores React Strict Mode double-renders, and uses a static name.
+const GLOBALS = globalThis as any;
+
+export let coreDB: RxDatabase | null = GLOBALS.__KOA_IMMORTAL_DB || null;
 
 const SYNC_MAP: Record<string, { table: string, type: string }[]> = {
   animals: [{ table: 'animals', type: 'animals' }, { table: 'archived_animals', type: 'archived_animals' }],
@@ -37,24 +41,19 @@ const listKeys = ['type', 'category', 'value'];
 const taskKeys = ['animal_id', 'title', 'due_date', 'completed', 'assigned_to', 'type', 'notes'];
 
 export const bootCoreDatabase = (): Promise<RxDatabase> => {
-  if (globalSandbox.__koa_coreDB) {
-    if (!coreDB) coreDB = globalSandbox.__koa_coreDB;
-    return Promise.resolve(coreDB);
+  // 1. If it's already booting or booted globally, return it immediately.
+  if (GLOBALS.__KOA_IMMORTAL_PROMISE) {
+    return GLOBALS.__KOA_IMMORTAL_PROMISE;
   }
 
-  if (coreDB) return Promise.resolve(coreDB);
+  console.log(`🛡️ [Core DB] Booting Immortal Engine...`);
 
-  if (globalSandbox.__koa_bootPromise) {
-    return globalSandbox.__koa_bootPromise;
-  }
-
-  const attemptBoot = async (dbName: string) => {
-    const db = await createRxDatabase({ 
-      name: dbName, 
-      storage: getRxStorageDexie(), 
-      ignoreDuplicate: true // Crucial for dev environments
-    });
-    
+  // 2. Lock it into the global window
+  GLOBALS.__KOA_IMMORTAL_PROMISE = createRxDatabase({ 
+    name: 'koa_manager_core_db_final', // Static name
+    storage: getRxStorageDexie(), 
+    multiInstance: false // CRITICAL: Disables iframe BroadcastChannels that cause ghost locks
+  }).then(async (db) => {
     await db.addCollections({
       animals: { schema: { version: 0, primaryKey: 'id', type: 'object', additionalProperties: false, properties: { ...baseProps, ...makeProps(animalKeys) }, required: ['id', 'record_type'] } },
       admin_records: { schema: { version: 0, primaryKey: 'id', type: 'object', additionalProperties: false, properties: { ...baseProps, ...makeProps(adminKeys) }, required: ['id', 'record_type'] } },
@@ -69,53 +68,76 @@ export const bootCoreDatabase = (): Promise<RxDatabase> => {
       operational_lists: { schema: { version: 0, primaryKey: 'id', type: 'object', additionalProperties: false, properties: { ...baseProps, ...makeProps(listKeys) }, required: ['id', 'record_type'] } },
       tasks: { schema: { version: 0, primaryKey: 'id', type: 'object', additionalProperties: false, properties: { ...baseProps, ...makeProps(taskKeys) }, required: ['id', 'record_type'] } }
     });
+    
+    coreDB = db;
+    GLOBALS.__KOA_IMMORTAL_DB = db;
     return db;
-  };
+  }).catch(err => {
+    console.error("Fatal Database Boot Error:", err);
+    GLOBALS.__KOA_IMMORTAL_PROMISE = null; // Free the lock on true failure
+    throw err;
+  });
 
-  console.log('🛡️ [Core DB] Booting Airtight Engine v55 (HMR Protected)...');
-
-  // Attach the promise, but clear it immediately if it fails
-  globalSandbox.__koa_bootPromise = attemptBoot('animaldb_core_v55')
-    .then(db => {
-      coreDB = db;
-      globalSandbox.__koa_coreDB = db;
-      return db;
-    })
-    .catch(async (e) => {
-      console.warn('⚠️ Primary boot failed. Attempting deep reset...', e.message);
-      globalSandbox.__koa_bootPromise = null; // Clear the ghost promise!
-      
-      const fallbackName = 'animaldb_core_v55_' + Date.now();
-      try {
-        const fallbackDb = await attemptBoot(fallbackName);
-        coreDB = fallbackDb;
-        globalSandbox.__koa_coreDB = fallbackDb;
-        return fallbackDb;
-      } catch (fallbackError) {
-        throw fallbackError;
-      }
-    });
-
-  return globalSandbox.__koa_bootPromise;
+  return GLOBALS.__KOA_IMMORTAL_PROMISE;
 };
 
+// 3. Neutralize the destroy function to prevent Strict Mode teardowns.
 export const destroyCoreDatabase = async () => {
-  if (coreDB) {
-    await (coreDB as any).destroy();
-    globalSandbox.__koa_coreDB = null;
-    globalSandbox.__koa_bootPromise = null;
-  }
+  console.log("🛑 [Core DB] Database destruction bypassed for stability.");
 };
 
-if (!globalSandbox.__koa_activeReplications) {
-    globalSandbox.__koa_activeReplications = [];
+if (!GLOBALS.__koa_activeReplications) {
+    GLOBALS.__koa_activeReplications = [];
 }
-const activeReplications: RxSupabaseReplicationState<unknown>[] = globalSandbox.__koa_activeReplications;
+const activeReplications: RxSupabaseReplicationState<unknown>[] = GLOBALS.__koa_activeReplications;
+
+// 🛡️ The Supabase Payload Interceptor
+// Prevents missing/null IDs from reaching RxDB and causing 22P02 Postgres crashes
+const createSafeSupabaseClient = (client: any) => {
+  return new Proxy(client, {
+    get(target, prop) {
+      if (prop === 'from') {
+        return (table: string) => {
+          const queryObj = target.from(table);
+          return new Proxy(queryObj, {
+            get(qTarget, qProp) {
+              if (qProp === 'select') {
+                return (...args: any[]) => {
+                  const builder = qTarget.select(...args);
+                  const originalThen = builder.then.bind(builder);
+                  
+                  builder.then = (onFulfilled: any, onRejected: any) => {
+                    return originalThen((response: any) => {
+                      if (response?.data && Array.isArray(response.data)) {
+                        response.data = response.data.map((row: any) => {
+                          const cleanRow = { ...row };
+                          if (!cleanRow.id) cleanRow.id = crypto.randomUUID(); // Inject valid UUID
+                          return cleanRow;
+                        });
+                      }
+                      return onFulfilled ? onFulfilled(response) : response;
+                    }, onRejected);
+                  };
+                  return builder;
+                };
+              }
+              const value = qTarget[qProp as keyof typeof qTarget];
+              return typeof value === 'function' ? value.bind(qTarget) : value;
+            }
+          });
+        };
+      }
+      return target[prop as keyof typeof target];
+    }
+  });
+};
 
 export const startCoreSync = async (db: RxDatabase, realSupabaseClient: any) => {
   if (!db || !realSupabaseClient) return;
 
-  console.log('🔗 [Core DB] Engaging Official Authenticated Sync v55...');
+  console.log('🔗 [Core DB] Engaging Official Authenticated Sync (Protected)...');
+
+  const safeSupabaseClient = createSafeSupabaseClient(realSupabaseClient);
 
   activeReplications.forEach(state => state.cancel());
   activeReplications.length = 0;
@@ -128,8 +150,8 @@ export const startCoreSync = async (db: RxDatabase, realSupabaseClient: any) => 
       try {
         const state = replicateSupabase({
           collection,
-          replicationIdentifier: `core_${colName}_${config.table}_v55`,
-          client: realSupabaseClient,
+          replicationIdentifier: `core_${colName}_${config.table}_sync_final`,
+          client: safeSupabaseClient,
           tableName: config.table,
           deletedField: 'is_deleted',
           pull: { 
@@ -139,7 +161,7 @@ export const startCoreSync = async (db: RxDatabase, realSupabaseClient: any) => 
               Object.keys(cleanDoc).forEach(key => {
                 if (cleanDoc[key] === null) delete cleanDoc[key];
               });
-              if (!cleanDoc.id) cleanDoc.id = cleanDoc.role || cleanDoc.name || cleanDoc.type || String(Date.now() + Math.random());
+              if (!cleanDoc.id) cleanDoc.id = cleanDoc.role || cleanDoc.name || cleanDoc.type || crypto.randomUUID();
               return { ...cleanDoc, id: String(cleanDoc.id), record_type: config.type };
             } 
           },
@@ -163,20 +185,3 @@ export const startCoreSync = async (db: RxDatabase, realSupabaseClient: any) => 
     }
   }
 };
-
-// 🔥 VITE HMR CLEANUP HOOK
-// This tells Vite to gracefully destroy the database connection BEFORE reloading the page
-// @ts-ignore
-if (import.meta.hot) {
-  // @ts-ignore
-  import.meta.hot.dispose(() => {
-    console.log('🧹 [Vite HMR] Cleaning up IndexedDB connections...');
-    if (coreDB) {
-      coreDB.destroy();
-    }
-    activeReplications.forEach(state => state.cancel());
-    globalSandbox.__koa_coreDB = null;
-    globalSandbox.__koa_bootPromise = null;
-    globalSandbox.__koa_activeReplications = [];
-  });
-}

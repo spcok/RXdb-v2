@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuthStore } from '../store/authStore';
-import { coreDB } from '../lib/DatabaseCore';
+import { coreDB, bootCoreDatabase } from '../lib/DatabaseCore';
 
-// The locked-down default for guests and loading states
 const lockedPermissions = {
   isAdmin: false, isOwner: false, isSeniorKeeper: false, isVolunteer: false, isStaff: false,
   view_animals: false, add_animals: false, edit_animals: false, archive_animals: false,
@@ -23,7 +22,6 @@ const lockedPermissions = {
   canGenerateReports: false, canManageUsers: false, canViewMovements: false, canEditMovements: false,
 };
 
-// The absolute Master Key for Owners and Admins
 const unlockedPermissions = Object.keys(lockedPermissions).reduce((acc, key) => {
   acc[key] = true;
   return acc;
@@ -33,70 +31,87 @@ export function usePermissions() {
   const { currentUser } = useAuthStore();
   
   const [permissions, setPermissions] = useState<any>(() => {
-    // 🚨 1. Normalize the role to uppercase to defeat case-sensitivity bugs
-    const role = String(currentUser?.role || 'GUEST').toUpperCase();
+    const rawRole = currentUser?.role || currentUser?.user_metadata?.role || 'GUEST';
+    const role = String(rawRole).toUpperCase();
     
-    // 🚨 2. SUPERADMIN OVERRIDE: Owners and Admins are instantly granted the Master Key.
-    // They never have to wait for the database to sync.
+    // Master Key Bypass
     if (role === 'OWNER' || role === 'ADMIN') {
-      return { 
-        ...unlockedPermissions, 
-        role,
-        isAdmin: role === 'ADMIN',
-        isOwner: role === 'OWNER',
-      };
+      return { ...unlockedPermissions, role, isAdmin: role === 'ADMIN', isOwner: role === 'OWNER' };
     }
-
     return { ...lockedPermissions, role };
   });
 
   useEffect(() => {
-    if (!coreDB || !currentUser?.role) return;
+    let isMounted = true;
+    let subscription: any;
 
-    const currentRole = String(currentUser.role).toUpperCase();
+    const initializePermissions = async () => {
+      const rawRole = currentUser?.role || currentUser?.user_metadata?.role;
+      if (!rawRole) return;
 
-    // If they are an Owner/Admin, we already unlocked the UI on line 42. Skip the database query.
-    if (currentRole === 'OWNER' || currentRole === 'ADMIN') return;
-
-    // For standard Staff/Keepers, actively query the local database for their specific rulebook
-    const sub = coreDB.admin_records.find({
-      selector: { record_type: 'role_permission' }
-    }).$.subscribe((docs) => {
+      const currentRole = String(rawRole).toUpperCase();
       
-      // Manually find the matching role to completely bypass case-sensitivity issues
-      const dbPerms = docs.find(d => String(d.toJSON().role).toUpperCase() === currentRole)?.toJSON();
-      
-      if (dbPerms) {
-        setPermissions({
-          ...lockedPermissions,
-          role: currentRole,
-          
-          isAdmin: false,
-          isOwner: false,
-          isSeniorKeeper: currentRole === 'SENIOR_KEEPER',
-          isVolunteer: currentRole === 'VOLUNTEER',
-          isStaff: true,
-          
-          // Map backend snake_case to frontend camelCase
-          canViewAnimals: dbPerms.view_animals || false,
-          canEditAnimals: dbPerms.edit_animals || false,
-          canViewMedical: dbPerms.view_medical || false,
-          canEditMedical: dbPerms.edit_medical || false,
-          canViewReports: dbPerms.generate_reports || false,
-          canManageStaff: dbPerms.manage_users || false,
-          canEditSettings: dbPerms.view_settings || false,
-          canViewSettings: dbPerms.view_settings || false,
-          canGenerateReports: dbPerms.generate_reports || false,
-          canManageUsers: dbPerms.manage_users || false,
-          canViewMovements: dbPerms.view_movements || false,
-          canEditMovements: dbPerms.log_internal_movements || false,
-          
-          ...dbPerms
-        });
+      // If Admin, the state is already unlocked on line 38. Skip DB query.
+      if (currentRole === 'OWNER' || currentRole === 'ADMIN') {
+          console.log(`🔓 [Permissions] Master Key granted for ${currentRole}`);
+          return;
       }
-    });
 
-    return () => sub.unsubscribe();
+      try {
+        // Force React to wait for the database to boot
+        const db = coreDB || await bootCoreDatabase();
+        if (!isMounted) return;
+
+        subscription = db.admin_records.find({
+          selector: { record_type: 'role_permission' }
+        }).$.subscribe((docs) => {
+          
+          console.log(`🕵️ [Permissions] Target Role: ${currentRole}`);
+          console.log(`🕵️ [Permissions] Rules found in Local DB: ${docs.length}`);
+          
+          const dbPerms = docs.find(d => String(d.toJSON().role).toUpperCase() === currentRole)?.toJSON();
+          
+          if (dbPerms) {
+            console.log(`✅ [Permissions] Successfully applied rulebook for ${currentRole}`);
+            if (isMounted) {
+              setPermissions({
+                ...lockedPermissions,
+                role: currentRole,
+                isAdmin: false,
+                isOwner: false,
+                isSeniorKeeper: currentRole === 'SENIOR_KEEPER',
+                isVolunteer: currentRole === 'VOLUNTEER',
+                isStaff: true,
+                canViewAnimals: dbPerms.view_animals || false,
+                canEditAnimals: dbPerms.edit_animals || false,
+                canViewMedical: dbPerms.view_medical || false,
+                canEditMedical: dbPerms.edit_medical || false,
+                canViewReports: dbPerms.generate_reports || false,
+                canManageStaff: dbPerms.manage_users || false,
+                canEditSettings: dbPerms.view_settings || false,
+                canViewSettings: dbPerms.view_settings || false,
+                canGenerateReports: dbPerms.generate_reports || false,
+                canManageUsers: dbPerms.manage_users || false,
+                canViewMovements: dbPerms.view_movements || false,
+                canEditMovements: dbPerms.log_internal_movements || false,
+                ...dbPerms
+              });
+            }
+          } else {
+             console.warn(`❌ [Permissions] Local DB is missing the rulebook for ${currentRole}. Check Supabase data!`);
+          }
+        });
+      } catch (error) {
+        console.error('❌ [Permissions] Failed to sync role permissions from cache:', error);
+      }
+    };
+
+    initializePermissions();
+
+    return () => {
+      isMounted = false;
+      if (subscription) subscription.unsubscribe();
+    };
   }, [currentUser]);
 
   return permissions;
