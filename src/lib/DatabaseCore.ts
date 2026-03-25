@@ -1,10 +1,10 @@
 import { createRxDatabase, RxDatabase } from 'rxdb';
 import { getRxStorageDexie } from 'rxdb/plugins/storage-dexie';
 import { replicateSupabase, RxSupabaseReplicationState } from 'rxdb/plugins/replication-supabase';
+import { supabase } from './supabase';
 
-const GLOBALS = globalThis as any;
-
-export let coreDB: RxDatabase | null = GLOBALS.__KOA_IMMORTAL_DB || null;
+let dbInstance: any = null;
+export let coreDB: RxDatabase | null = null;
 
 const SYNC_MAP: Record<string, { table: string, type: string }[]> = {
   animals: [{ table: 'animals', type: 'animals' }, { table: 'archived_animals', type: 'archived_animals' }],
@@ -37,16 +37,18 @@ const safetyDrillKeys = ['date', 'title', 'location', 'priority', 'status', 'des
 const listKeys = ['type', 'category', 'value'];
 const taskKeys = ['animal_id', 'title', 'due_date', 'completed', 'assigned_to', 'type', 'notes'];
 
-export const bootCoreDatabase = (): Promise<RxDatabase> => {
-  if (GLOBALS.__KOA_IMMORTAL_PROMISE) return GLOBALS.__KOA_IMMORTAL_PROMISE;
+export const bootCoreDatabase = async (): Promise<RxDatabase> => {
+  if (dbInstance) return dbInstance;
 
   console.log(`🛡️ [Core DB] Booting Immortal Engine...`);
 
-  GLOBALS.__KOA_IMMORTAL_PROMISE = createRxDatabase({ 
-    name: 'koa_manager_core_db_final',
-    storage: getRxStorageDexie(), 
-    multiInstance: false 
-  }).then(async (db) => {
+  try {
+    const db = await createRxDatabase({ 
+      name: 'koa_manager_core_db_final',
+      storage: getRxStorageDexie(), 
+      multiInstance: false 
+    });
+
     await db.addCollections({
       animals: { schema: { version: 0, primaryKey: 'id', type: 'object', additionalProperties: false, properties: { ...baseProps, ...makeProps(animalKeys) }, required: ['id', 'record_type'] } },
       admin_records: { schema: { version: 0, primaryKey: 'id', type: 'object', additionalProperties: false, properties: { ...baseProps, ...makeProps(adminKeys) }, required: ['id', 'record_type'] } },
@@ -62,29 +64,28 @@ export const bootCoreDatabase = (): Promise<RxDatabase> => {
       tasks: { schema: { version: 0, primaryKey: 'id', type: 'object', additionalProperties: false, properties: { ...baseProps, ...makeProps(taskKeys) }, required: ['id', 'record_type'] } }
     });
     
+    dbInstance = db;
     coreDB = db;
-    GLOBALS.__KOA_IMMORTAL_DB = db;
-    return db;
-  }).catch(err => {
+    return dbInstance;
+  } catch (err) {
     console.error("Fatal Database Boot Error:", err);
-    GLOBALS.__KOA_IMMORTAL_PROMISE = null;
     throw err;
-  });
-
-  return GLOBALS.__KOA_IMMORTAL_PROMISE;
+  }
 };
 
 export const destroyCoreDatabase = async () => {
   console.log("🛑 [Core DB] Database destruction bypassed for stability.");
 };
 
-if (!GLOBALS.__koa_activeReplications) {
-    GLOBALS.__koa_activeReplications = [];
-}
-const activeReplications: RxSupabaseReplicationState<unknown>[] = GLOBALS.__koa_activeReplications;
+const activeReplications: RxSupabaseReplicationState<unknown>[] = [];
 
-export const startCoreSync = async (db: RxDatabase, realSupabaseClient: any) => {
-  if (!db || !realSupabaseClient) return;
+export const startCoreSync = async () => {
+  const db = await bootCoreDatabase();
+
+  if (!navigator.onLine) {
+    console.warn('⚠️ [Core DB] Offline: Skipping Supabase replication setup.');
+    return;
+  }
 
   console.log('🔗 [Core DB] Engaging Pure Native Sync (No Proxies)...');
 
@@ -100,7 +101,7 @@ export const startCoreSync = async (db: RxDatabase, realSupabaseClient: any) => 
         const state = replicateSupabase({
           collection,
           replicationIdentifier: `core_${colName}_${config.table}_sync_v6`, // 🚨 Master Reset v6
-          client: realSupabaseClient, // 🚨 Passed pure and untouched
+          client: supabase, // 🚨 Passed pure and untouched
           tableName: config.table,
           deletedField: 'is_deleted',
           pull: { 

@@ -7,6 +7,7 @@ import { useAuthStore } from './store/authStore';
 // 🛡️ Infrastructure Modules
 import { DatabaseBootProvider } from './providers/DatabaseBootProvider';
 import { AuthGuard } from './components/auth/AuthGuard';
+import { A11yProvider } from './providers/A11yProvider';
 
 // 📱 Main Feature Screens
 import DashboardContainer from './features/dashboard/DashboardContainer';
@@ -41,10 +42,11 @@ const App = () => {
 
   return (
     <ErrorBoundary>
-      <Router>
-        <DatabaseBootProvider>
-          <AuthGuard>
-            <Routes>
+      <A11yProvider>
+        <Router>
+          <DatabaseBootProvider>
+            <AuthGuard>
+              <Routes>
               <Route path="/" element={<Layout />}>
                 <Route index element={<DashboardContainer />} />
                 <Route path="weather" element={<WeatherView />} />
@@ -74,6 +76,7 @@ const App = () => {
           </AuthGuard>
         </DatabaseBootProvider>
       </Router>
+      </A11yProvider>
     </ErrorBoundary>
   );
 };

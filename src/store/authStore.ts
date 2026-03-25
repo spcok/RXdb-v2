@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { Session } from '@supabase/supabase-js';
 import { User } from '../types';
 import { bootCoreDatabase } from '../lib/DatabaseCore';
+import { startCoreSync } from '../lib/SyncEngine';
 
 interface AuthState {
   session: Session | null;
@@ -36,80 +37,36 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   setUiLocked: (locked: boolean) => set({ isUiLocked: locked }),
 
   initialize: async () => {
-    if (get().initialized) return;
-    set({ initialized: true });
-
-    // Always register the auth state change listener
-    supabase.auth.onAuthStateChange(async (_event, newSession) => {
-      if (newSession) {
-        try {
-          const { data: profile } = await withTimeout(
-            supabase.from('users').select('*').eq('id', newSession.user.id).single(),
-            5000,
-            "Profile fetch timeout"
-          );
-            
-          const userData = profile || {
-            ...newSession.user,
-            role: newSession.user.user_metadata?.role || 'GUEST'
-          };
-
-          console.log(`👤 [Auth] Login Resolved Role: ${userData.role}`);
-          set({ session: newSession, currentUser: userData, isLoading: false });
-        } catch (err) {
-          console.warn('⚠️ [Auth] Profile fetch failed during auth state change:', err);
-          const userData = {
-            ...newSession.user,
-            role: newSession.user.user_metadata?.role || 'GUEST'
-          };
-          set({ session: newSession, currentUser: userData, isLoading: false });
-        }
-      } else {
-        set({ session: null, currentUser: null, isLoading: false });
-      }
-    });
-
     try {
-      console.log('🛡️ [Auth] Initializing Real Supabase Auth...');
-      
-      const { data: { session }, error } = await withTimeout(
-        supabase.auth.getSession(),
-        5000,
-        "Supabase getSession timeout"
-      );
-      
-      if (error) throw error;
+      if (navigator.onLine) {
+        const { data: { session } } = await withTimeout(
+           supabase.auth.getSession(), 
+           3000, 
+           "Session check timed out"
+        );
+        
+        if (session?.user) {
+          // 🚨 CRITICAL FIX: Wake up the sync engine on desktop refresh!
+          startCoreSync().catch(e => console.error("Background sync failed:", e));
 
-      if (session) {
-        let profile = null;
-        try {
-          const { data, error: profileError } = await withTimeout(
-            supabase.from('users').select('*').eq('id', session.user.id).single(),
-            5000,
-            "Profile fetch timeout"
-          );
-          if (profileError && profileError.code !== 'PGRST116') {
-             console.warn('⚠️ [Auth] Profile fetch issue (RLS might be blocking):', profileError.message);
-          }
-          profile = data;
-        } catch (err) {
-          console.warn('⚠️ [Auth] Profile fetch timeout or error:', err);
+          set({
+            session,
+            currentUser: {
+              id: session.user.id,
+              email: session.user.email || '',
+              name: session.user.user_metadata?.name || 'Staff Member',
+              role: session.user.user_metadata?.role || 'GUEST',
+              initials: session.user.user_metadata?.initials || '??'
+            },
+            isLoading: false
+          });
+          return;
         }
-
-        const userData = profile || {
-          ...session.user,
-          role: session.user.user_metadata?.role || 'GUEST'
-        };
-
-        console.log(`👤 [Auth] Boot Resolved Role: ${userData.role}`);
-        set({ session, currentUser: userData, isLoading: false });
-      } else {
-        set({ session: null, currentUser: null, isLoading: false });
       }
-
+      set({ isLoading: false });
     } catch (error) {
-      console.error('❌ [Auth Error] Failed to initialize session:', error);
-      set({ session: null, currentUser: null, isLoading: false });
+      console.warn('Auth init skipped/timed out:', error);
+      set({ isLoading: false });
     }
   },
 
