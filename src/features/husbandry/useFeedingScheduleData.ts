@@ -16,19 +16,15 @@ export function useFeedingScheduleData() {
         const db = coreDB || await bootCoreDatabase();
         if (!isMounted) return;
 
-        const animalsSub = db.animals.find({
-          selector: { is_deleted: { $eq: false } }
-        }).$.subscribe(docs => {
+        const animalsSub = db.animals.find().$.subscribe(docs => {
           if (isMounted) {
-            setAnimals(docs.map(d => d.toJSON() as Animal));
+            setAnimals(docs.map(d => d.toJSON() as Animal).filter(d => !d.is_deleted));
           }
         });
 
-        const tasksSub = db.tasks.find({
-          selector: { is_deleted: { $eq: false } }
-        }).$.subscribe(docs => {
+        const tasksSub = db.tasks.find().$.subscribe(docs => {
           if (isMounted) {
-            setTasks(docs.map(d => d.toJSON() as Task));
+            setTasks(docs.map(d => d.toJSON() as Task).filter(d => !d.is_deleted));
             setIsLoading(false);
           }
         });

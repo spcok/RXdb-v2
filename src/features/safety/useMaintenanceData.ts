@@ -16,12 +16,11 @@ export function useMaintenanceData() {
         const db = coreDB || await bootCoreDatabase();
         if (!isMounted) return;
 
-        sub = db.maintenance_logs.find({
-          selector: { is_deleted: { $eq: false } },
-          sort: [{ date: 'desc' }]
-        }).$.subscribe(docs => {
+        sub = db.maintenance_logs.find().$.subscribe(docs => {
           if (isMounted) {
-            setLogs(docs.map(d => d.toJSON() as MaintenanceLog));
+            const rawData = docs.map(d => d.toJSON() as MaintenanceLog).filter(d => !d.is_deleted);
+            const sortedData = rawData.sort((a, b) => new Date(b.date_logged || 0).getTime() - new Date(a.date_logged || 0).getTime());
+            setLogs(sortedData);
             setIsLoading(false);
           }
         });

@@ -42,7 +42,7 @@ export function useDashboardData(activeTab: AnimalCategory | 'ARCHIVED', viewDat
           selector: { record_type: 'animals' }
         }).$.subscribe(docs => {
           if (isMounted) {
-            setLiveAnimals(docs.map(d => d.toJSON() as Animal));
+            setLiveAnimals(docs.map(d => d.toJSON() as Animal).filter(d => !d.is_deleted));
             setIsLoading(false);
           }
         });
@@ -50,13 +50,13 @@ export function useDashboardData(activeTab: AnimalCategory | 'ARCHIVED', viewDat
         const archivedSub = db.animals.find({
           selector: { record_type: 'archived_animals' }
         }).$.subscribe(docs => {
-          if (isMounted) setArchivedAnimals(docs.map(d => d.toJSON() as Animal));
+          if (isMounted) setArchivedAnimals(docs.map(d => d.toJSON() as Animal).filter(d => !d.is_deleted));
         });
 
         const logsSub = db.daily_records.find({
           selector: { log_date: viewDate }
         }).$.subscribe(docs => {
-          if (isMounted) setLogs(docs.map(d => d.toJSON() as LogEntry));
+          if (isMounted) setLogs(docs.map(d => d.toJSON() as LogEntry).filter(d => !d.is_deleted));
         });
 
         subs = [liveSub, archivedSub, logsSub];

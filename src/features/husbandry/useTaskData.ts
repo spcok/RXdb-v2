@@ -22,11 +22,9 @@ export const useTaskData = () => {
         if (!isMounted) return;
 
         subs = [
-          db.tasks.find({
-            selector: { is_deleted: { $eq: false } }
-          }).$.subscribe(docs => {
+          db.tasks.find().$.subscribe(docs => {
             if (isMounted) {
-              const rawData = docs.map(d => d.toJSON() as Task);
+              const rawData = docs.map(d => d.toJSON() as Task).filter(d => !d.is_deleted);
               // Sort in memory by date
               const sortedData = rawData.sort((a, b) => 
                 new Date(a.due_date || 0).getTime() - new Date(b.due_date || 0).getTime()
@@ -35,11 +33,9 @@ export const useTaskData = () => {
             }
           }),
 
-          db.animals.find({
-            selector: { is_deleted: { $eq: false } }
-          }).$.subscribe(docs => {
+          db.animals.find().$.subscribe(docs => {
             if (isMounted) {
-              setAnimals(docs.map(d => d.toJSON() as Animal));
+              setAnimals(docs.map(d => d.toJSON() as Animal).filter(d => !d.is_deleted));
               setIsLoading(false);
             }
           })

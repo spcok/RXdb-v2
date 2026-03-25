@@ -1,12 +1,20 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { coreDB, bootCoreDatabase } from '../../lib/DatabaseCore';
 import { Animal } from '../../types';
 import { usePermissions } from '../../hooks/usePermissions';
+import { useAnimalsData } from './useAnimalsData';
 
-export const AnimalsList = ({ animals, onSelectAnimal }: { animals: Animal[], onSelectAnimal: (animal: Animal) => void }) => {
+// 🚨 1. Removed the 'export' keyword and props from here
+const AnimalsList = () => {
   const [activeTab, setActiveTab] = useState<'live' | 'archived'>('live');
   const [archivedAnimals, setArchivedAnimals] = useState<Animal[]>([]);
+  
   const permissions = usePermissions();
+  const navigate = useNavigate();
+  
+  // 🚨 2. Fetching the live animals directly inside the component
+  const { animals } = useAnimalsData(); 
 
   useEffect(() => {
     let isMounted = true;
@@ -21,7 +29,7 @@ export const AnimalsList = ({ animals, onSelectAnimal }: { animals: Animal[], on
           selector: { record_type: 'archived_animals' }
         }).$.subscribe(docs => {
           if (isMounted) {
-            setArchivedAnimals(docs.map(d => d.toJSON() as Animal));
+            setArchivedAnimals(docs.map(d => d.toJSON() as Animal).filter(d => !d.is_deleted));
           }
         });
       } catch (err) {
@@ -37,6 +45,11 @@ export const AnimalsList = ({ animals, onSelectAnimal }: { animals: Animal[], on
   }, []);
 
   const canViewArchived = permissions.isAdmin || permissions.isOwner;
+
+  // 🚨 3. Handling the click routing natively
+  const handleSelectAnimal = (animal: Animal) => {
+    navigate(`/animals/${animal.id}`);
+  };
 
   return (
     <div className="space-y-6">
@@ -70,31 +83,41 @@ export const AnimalsList = ({ animals, onSelectAnimal }: { animals: Animal[], on
 
       {activeTab === 'live' ? (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-            {/* Render live animals here */}
-            {animals.map(animal => (
-                <div key={animal.id} className="p-4 border-b border-slate-100 cursor-pointer hover:bg-slate-50" onClick={() => onSelectAnimal(animal)}>
-                    {animal.name} - {animal.species}
-                </div>
-            ))}
+            {animals.length === 0 ? (
+                <div className="p-8 text-center text-slate-500">No live animals found.</div>
+            ) : (
+                animals.map(animal => (
+                    <div key={animal.id} className="p-4 border-b border-slate-100 cursor-pointer hover:bg-slate-50 transition-colors" onClick={() => handleSelectAnimal(animal)}>
+                        <span className="font-bold text-slate-900">{animal.name}</span> <span className="text-slate-500">- {animal.species}</span>
+                    </div>
+                ))
+            )}
         </div>
       ) : (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-          {archivedAnimals.map(animal => (
-            <div key={animal.id} className="p-4 border-b border-slate-100 cursor-pointer hover:bg-slate-50" onClick={() => onSelectAnimal(animal)}>
-              <div className="flex justify-between items-center">
-                <div>
-                  <div className="font-bold text-slate-900">{animal.name}</div>
-                  <div className="text-sm text-slate-500">{animal.species}</div>
+          {archivedAnimals.length === 0 ? (
+                <div className="p-8 text-center text-slate-500">No archived records found.</div>
+          ) : (
+              archivedAnimals.map(animal => (
+                <div key={animal.id} className="p-4 border-b border-slate-100 cursor-pointer hover:bg-slate-50 transition-colors" onClick={() => handleSelectAnimal(animal)}>
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <div className="font-bold text-slate-900">{animal.name}</div>
+                      <div className="text-sm text-slate-500">{animal.species}</div>
+                    </div>
+                    <div className="text-right text-xs text-slate-400">
+                      <div>Reason: {animal.archive_reason || 'Unknown'}</div>
+                      <div>Archived: {animal.archived_at ? new Date(animal.archived_at).toLocaleDateString() : '--'}</div>
+                    </div>
+                  </div>
                 </div>
-                <div className="text-right text-xs text-slate-400">
-                  <div>Reason: {animal.archive_reason}</div>
-                  <div>Archived: {new Date(animal.archived_at || '').toLocaleDateString()}</div>
-                </div>
-              </div>
-            </div>
-          ))}
+              ))
+          )}
         </div>
       )}
     </div>
   );
 };
+
+// 🚨 4. Providing the required default export
+export default AnimalsList;

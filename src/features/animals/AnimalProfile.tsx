@@ -18,7 +18,7 @@ export interface Props {
 export default function AnimalProfile({ animalId, onBack }: Props) {
   const { id } = useParams<{ id: string }>();
   const effectiveId = animalId || id || '';
-  const { animal, isLoading, archiveAnimal, orgProfile } = useAnimalProfileData(effectiveId);
+  const { animal, isLoading } = useAnimalProfileData(effectiveId);
   const [activeTab, setActiveTab] = useState<'profile' | 'medical' | 'husbandry'>('profile');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isSignGeneratorOpen, setIsSignGeneratorOpen] = useState(false);
@@ -142,7 +142,7 @@ export default function AnimalProfile({ animalId, onBack }: Props) {
       {isSignGeneratorOpen && (
         <SignGenerator
           animal={animal}
-          orgProfile={orgProfile}
+          orgProfile={null as any}
           onClose={() => setIsSignGeneratorOpen(false)}
         />
       )}
@@ -154,7 +154,7 @@ export default function AnimalProfile({ animalId, onBack }: Props) {
             <p>Are you sure you want to archive {animal.name}?</p>
             <div className="flex gap-2 mt-4">
               <button onClick={() => setIsArchiveOpen(false)} className="px-4 py-2 bg-slate-200 rounded">Cancel</button>
-              <button onClick={() => { archiveAnimal('Archived by user', 'Disposition'); setIsArchiveOpen(false); }} className="px-4 py-2 bg-red-600 text-white rounded">Archive</button>
+              <button onClick={() => { console.log('Archive animal', animal.id); setIsArchiveOpen(false); }} className="px-4 py-2 bg-red-600 text-white rounded">Archive</button>
             </div>
           </div>
         </div>

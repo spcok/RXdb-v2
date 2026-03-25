@@ -18,13 +18,14 @@ export function useTransfersData() {
 
         sub = db.logistics_records.find({
           selector: { 
-            is_deleted: { $eq: false },
+            
             record_type: { $eq: 'transfers' }
-          },
-          sort: [{ date: 'desc' }]
+          }
         }).$.subscribe(docs => {
           if (isMounted) {
-            setTransfers(docs.map(d => d.toJSON() as ExternalTransfer));
+            const rawData = docs.map(d => d.toJSON() as ExternalTransfer).filter(d => !d.is_deleted);
+            const sortedData = rawData.sort((a, b) => new Date((b as any).transfer_date || 0).getTime() - new Date((a as any).transfer_date || 0).getTime());
+            setTransfers(sortedData);
             setIsLoading(false);
           }
         });

@@ -41,8 +41,7 @@ const defaultPermissions: Omit<RolePermissionConfig, 'role'> = {
   generate_reports: false,
   view_settings: false,
   manage_users: false,
-  manage_roles: false,
-};
+  manage_roles: false};
 
 export const useRoleSettings = () => {
   const [roles, setRoles] = useState<RolePermissionConfig[]>([]);
@@ -58,12 +57,10 @@ export const useRoleSettings = () => {
 
         sub = db.admin_records.find({
           selector: {
-            record_type: 'role_permission',
-            is_deleted: { $eq: false }
-          }
+            record_type: 'role_permission'}
         }).$.subscribe(docs => {
           if (isMounted) {
-            setRoles(docs.map(d => d.toJSON() as RolePermissionConfig));
+            setRoles(docs.map(d => d.toJSON() as RolePermissionConfig).filter(d => !(d as any).is_deleted));
           }
         });
       } catch (err) {
@@ -92,8 +89,7 @@ export const useRoleSettings = () => {
         for (const role of missingRoles) {
           const newRoleConfig: RolePermissionConfig = {
             role,
-            ...defaultPermissions,
-          };
+            ...defaultPermissions};
           try {
             await db.admin_records.upsert({
               ...newRoleConfig,
@@ -120,8 +116,7 @@ export const useRoleSettings = () => {
 
     const updatedConfig = {
       ...roleConfig,
-      [permissionKey]: newValue,
-    };
+      [permissionKey]: newValue};
 
     try {
       await db.admin_records.upsert({

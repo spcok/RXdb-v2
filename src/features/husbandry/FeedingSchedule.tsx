@@ -23,7 +23,7 @@ const FeedingSchedule: React.FC = () => {
           selector: { type: 'food' }
         }).$.subscribe(docs => {
           if (isMounted) {
-            setFoodOptions(docs.map(d => d.toJSON() as OperationalList));
+            setFoodOptions(docs.map(d => d.toJSON() as OperationalList).filter(d => !d.is_deleted));
           }
         });
       } catch (err) {

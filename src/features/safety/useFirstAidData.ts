@@ -16,12 +16,11 @@ export function useFirstAidData() {
         const db = coreDB || await bootCoreDatabase();
         if (!isMounted) return;
 
-        sub = db.first_aid_logs.find({
-          selector: { is_deleted: { $eq: false } },
-          sort: [{ date: 'desc' }]
-        }).$.subscribe(docs => {
+        sub = db.first_aid_logs.find().$.subscribe(docs => {
           if (isMounted) {
-            setLogs(docs.map(d => d.toJSON() as FirstAidLog));
+            const rawData = docs.map(d => d.toJSON() as FirstAidLog).filter(d => !d.is_deleted);
+            const sortedData = rawData.sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
+            setLogs(sortedData);
             setIsLoading(false);
           }
         });

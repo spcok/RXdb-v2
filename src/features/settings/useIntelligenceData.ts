@@ -16,11 +16,9 @@ export function useIntelligenceData() {
         const db = coreDB || await bootCoreDatabase();
         if (!isMounted) return;
 
-        sub = db.animals.find({
-          selector: { is_deleted: { $eq: false } }
-        }).$.subscribe(docs => {
+        sub = db.animals.find().$.subscribe(docs => {
           if (isMounted) {
-            setAnimals(docs.map(d => d.toJSON() as Animal));
+            setAnimals(docs.map(d => d.toJSON() as Animal).filter(d => !d.is_deleted));
             setIsLoading(false);
           }
         });

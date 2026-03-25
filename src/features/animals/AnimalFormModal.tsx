@@ -24,8 +24,7 @@ const AnimalFormModal: React.FC<AnimalFormModalProps> = ({ isOpen, onClose, init
     form,
     handleImageUpload,
     isSubmitting,
-    errors,
-  } = useAnimalForm({ initialData, onClose });
+    errors} = useAnimalForm({ initialData, onClose });
 
   const { register, watch, setValue, getValues } = form;
   const { locations } = useOperationalLists();
@@ -56,24 +55,20 @@ const AnimalFormModal: React.FC<AnimalFormModalProps> = ({ isOpen, onClose, init
         parentMobsSub = db.animals.find({
           selector: {
             entity_type: EntityType.GROUP,
-            id: { $ne: initialData?.id || '' },
-            is_deleted: { $eq: false }
-          }
+            id: { $ne: initialData?.id || '' }}
         }).$.subscribe(docs => {
           if (isMounted) {
-            setParentMobs(docs.map(d => d.toJSON() as Animal));
+            setParentMobs(docs.map(d => d.toJSON() as Animal).filter(d => !d.is_deleted));
           }
         });
 
         if (initialData?.id) {
           linkedChildrenSub = db.animals.find({
             selector: {
-              parent_mob_id: initialData.id,
-              is_deleted: { $eq: false }
-            }
+              parent_mob_id: initialData.id}
           }).$.subscribe(docs => {
             if (isMounted) {
-              setLinkedChildrenCount(docs.length);
+              setLinkedChildrenCount(docs.filter(d => !d.toJSON().is_deleted).length);
             }
           });
         }
@@ -155,8 +150,7 @@ const AnimalFormModal: React.FC<AnimalFormModalProps> = ({ isOpen, onClose, init
       ...data,
       parent_mob_id: data.parent_mob_id === "" ? null : data.parent_mob_id,
       sire_id: data.sire_id === "" ? null : data.sire_id,
-      dam_id: data.dam_id === "" ? null : data.dam_id,
-    };
+      dam_id: data.dam_id === "" ? null : data.dam_id};
 
     // Establish the target ID early
     const targetId = initialData?.id || crypto.randomUUID();

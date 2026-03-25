@@ -46,27 +46,27 @@ export function useMissingRecordsData() {
         const db = coreDB || await bootCoreDatabase();
         if (!isMounted) return;
 
-        const animalsSub = db.animals.find({ selector: { is_deleted: { $eq: false } } }).$.subscribe(docs => {
-          if (isMounted) setAnimals(docs.map(d => d.toJSON() as Animal));
+        const animalsSub = db.animals.find().$.subscribe(docs => {
+          if (isMounted) setAnimals(docs.map(d => d.toJSON() as Animal).filter(d => !d.is_deleted));
         });
 
         const dailyLogsSub = db.daily_records.find({ 
           selector: { 
-            is_deleted: { $eq: false },
+            
             record_type: { $eq: 'daily_logs_v2' }
           } 
         }).$.subscribe(docs => {
-          if (isMounted) setDailyLogs(docs.map(d => d.toJSON() as LogEntry));
+          if (isMounted) setDailyLogs(docs.map(d => d.toJSON() as LogEntry).filter(d => !d.is_deleted));
         });
 
         const medicalLogsSub = db.clinical_records.find({ 
           selector: { 
-            is_deleted: { $eq: false },
+            
             record_type: { $eq: 'medical_logs' }
           } 
         }).$.subscribe(docs => {
           if (isMounted) {
-            setMedicalLogs(docs.map(d => d.toJSON() as ClinicalNote));
+            setMedicalLogs(docs.map(d => d.toJSON() as ClinicalNote).filter(d => !d.is_deleted));
             setIsLoading(false);
           }
         });
@@ -280,8 +280,7 @@ export function useMissingRecordsData() {
       categoryCompliance[category] = {
         husbandry: Math.round(d.husbandry.reduce((a, b) => a + b, 0) / d.husbandry.length),
         details: Math.round(d.details.reduce((a, b) => a + b, 0) / d.details.length),
-        health: Math.round(d.health.reduce((a, b) => a + b, 0) / d.health.length),
-      };
+        health: Math.round(d.health.reduce((a, b) => a + b, 0) / d.health.length)};
     }
 
     return {

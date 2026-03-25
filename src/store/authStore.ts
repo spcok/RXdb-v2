@@ -8,20 +8,47 @@ interface AuthState {
   currentUser: User | null; 
   isLoading: boolean;
   isUiLocked: boolean;
+  initialized: boolean;
   setUiLocked: (locked: boolean) => void;
   initialize: () => Promise<void>;
   login: (email: string, password: string) => Promise<void>; 
   logout: () => Promise<void>;
 }
 
-export const useAuthStore = create<AuthState>((set) => ({
+export const useAuthStore = create<AuthState>((set, get) => ({
   session: null,
   currentUser: null,
   isLoading: true,
   isUiLocked: false,
+  initialized: false,
   setUiLocked: (locked: boolean) => set({ isUiLocked: locked }),
 
   initialize: async () => {
+    if (get().initialized) return;
+    set({ initialized: true });
+
+    // Always register the auth state change listener
+    supabase.auth.onAuthStateChange(async (_event, newSession) => {
+      if (newSession) {
+        const { data: profile } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', newSession.user.id)
+          .single();
+          
+        const userData = profile || {
+          ...newSession.user,
+          role: newSession.user.user_metadata?.role || 'GUEST'
+        };
+
+        console.log(`👤 [Auth] Login Resolved Role: ${userData.role}`);
+
+        set({ session: newSession, currentUser: userData, isLoading: false });
+      } else {
+        set({ session: null, currentUser: null, isLoading: false });
+      }
+    });
+
     try {
       console.log('🛡️ [Auth] Initializing Real Supabase Auth...');
       
@@ -51,27 +78,6 @@ export const useAuthStore = create<AuthState>((set) => ({
       } else {
         set({ session: null, currentUser: null, isLoading: false });
       }
-
-      supabase.auth.onAuthStateChange(async (_event, newSession) => {
-        if (newSession) {
-          const { data: profile } = await supabase
-            .from('users')
-            .select('*')
-            .eq('id', newSession.user.id)
-            .single();
-            
-          const userData = profile || {
-            ...newSession.user,
-            role: newSession.user.user_metadata?.role || 'GUEST'
-          };
-
-          console.log(`👤 [Auth] Login Resolved Role: ${userData.role}`);
-
-          set({ session: newSession, currentUser: userData, isLoading: false });
-        } else {
-          set({ session: null, currentUser: null, isLoading: false });
-        }
-      });
 
     } catch (error) {
       console.error('❌ [Auth Error] Failed to initialize session:', error);

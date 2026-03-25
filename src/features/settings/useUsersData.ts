@@ -23,24 +23,22 @@ export function useUsersData() {
 
         const usersSub = db.admin_records.find({
           selector: {
-            record_type: 'user',
-            is_deleted: { $eq: false }
-          }
+            record_type: 'user'}
         }).$.subscribe(docs => {
           if (isMounted) {
-            setUsers(docs.map(d => d.toJSON() as unknown as User));
+            const rawData = docs.map(d => d.toJSON() as unknown as User).filter(d => !(d as any).is_deleted);
+            const sortedData = rawData.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+            setUsers(sortedData);
             setIsLoading(false);
           }
         });
 
         const rolesSub = db.admin_records.find({
           selector: {
-            record_type: 'role_permission',
-            is_deleted: { $eq: false }
-          }
+            record_type: 'role_permission'}
         }).$.subscribe(docs => {
           if (isMounted) {
-            const rolesData = docs.map(d => d.toJSON() as unknown as RolePermissionConfig);
+            const rolesData = docs.map(d => d.toJSON() as unknown as RolePermissionConfig).filter(d => !(d as any).is_deleted);
             const roleOrder = ['VOLUNTEER', 'KEEPER', 'SENIOR_KEEPER', 'ADMIN', 'OWNER'];
             const sortedRoles = rolesData.sort((a, b) => 
               roleOrder.indexOf(a.role) - roleOrder.indexOf(b.role)

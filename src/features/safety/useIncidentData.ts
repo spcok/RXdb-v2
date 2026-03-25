@@ -18,12 +18,11 @@ export const useIncidentData = () => {
         const db = coreDB || await bootCoreDatabase();
         if (!isMounted) return;
 
-        sub = db.incidents.find({
-          selector: { is_deleted: { $eq: false } },
-          sort: [{ date: 'desc' }]
-        }).$.subscribe(docs => {
+        sub = db.incidents.find().$.subscribe(docs => {
           if (isMounted) {
-            setIncidents(docs.map(d => d.toJSON() as Incident));
+            const rawData = docs.map(d => d.toJSON() as Incident).filter(d => !d.is_deleted);
+            const sortedData = rawData.sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
+            setIncidents(sortedData);
             setIsLoading(false);
           }
         });

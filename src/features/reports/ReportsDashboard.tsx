@@ -154,26 +154,26 @@ export default function ReportsDashboard() {
         if (!isMounted) return;
 
         animalsSub = db.animals.find({
-          selector: { record_type: 'animals', is_deleted: { $eq: false } }
+          selector: { record_type: 'animals'}
         }).$.subscribe(docs => {
           if (isMounted) {
-            setAnimals(docs.map(d => d.toJSON() as Animal));
+            setAnimals(docs.map(d => d.toJSON() as Animal).filter(d => !d.is_deleted));
           }
         });
 
         archivedSub = db.animals.find({
-          selector: { record_type: 'archived_animals', is_deleted: { $eq: false } }
+          selector: { record_type: 'archived_animals'}
         }).$.subscribe(docs => {
           if (isMounted) {
-            setArchivedAnimals(docs.map(d => d.toJSON() as Animal));
+            setArchivedAnimals(docs.map(d => d.toJSON() as Animal).filter(d => !d.is_deleted));
           }
         });
 
         shiftsSub = db.staff_records.find({
-          selector: { record_type: 'shifts', is_deleted: { $eq: false } }
+          selector: { record_type: 'shifts'}
         }).$.subscribe(docs => {
           if (isMounted) {
-            setRawShifts(docs.map(d => d.toJSON() as Shift));
+            setRawShifts(docs.map(d => d.toJSON() as Shift).filter(d => !d.is_deleted));
           }
         });
       } catch (err) {
@@ -252,12 +252,11 @@ export default function ReportsDashboard() {
             log_date: {
               $gte: startDate,
               $lte: new Date(new Date(endDate).setHours(23, 59, 59, 999)).toISOString()
-            },
-            is_deleted: { $eq: false }
-          }
+            }}
         }).exec();
 
-        const logs = rawLogs.filter(log => {
+        const logs = rawLogs.map(d => d.toJSON() as any).filter(log => {
+          if (log.is_deleted) return false;
           if (!selectedSection) return true;
           return animalSectionMap.get(log.animal_id) === selectedSection;
         });
@@ -281,8 +280,7 @@ export default function ReportsDashboard() {
         if (previewContainerRef.current) {
           await renderAsync(blob, previewContainerRef.current, undefined, {
             className: 'docx-preview-page',
-            inWrapper: true,
-          });
+            inWrapper: true});
         }
         return;
       } else if (activeReportId === 'internal_movements') {
@@ -292,12 +290,11 @@ export default function ReportsDashboard() {
             log_date: {
               $gte: startDate,
               $lte: new Date(new Date(endDate).setHours(23, 59, 59, 999)).toISOString()
-            },
-            is_deleted: { $eq: false }
-          }
+            }}
         }).exec();
           
         const filteredMovements = rawData.map(d => d.toJSON() as InternalMovement).filter(m => {
+          if ((m as any).is_deleted) return false;
           if (!selectedSection) return true;
           return animalSectionMap.get(m.animal_id) === selectedSection;
         });
@@ -319,8 +316,7 @@ export default function ReportsDashboard() {
         if (previewContainerRef.current) {
           await renderAsync(blob, previewContainerRef.current, undefined, {
             className: 'docx-preview-page',
-            inWrapper: true,
-          });
+            inWrapper: true});
         }
         return;
       } else if (activeReportId === 'external_transfers') {
@@ -330,12 +326,11 @@ export default function ReportsDashboard() {
             date: {
               $gte: startDate,
               $lte: endDate
-            },
-            is_deleted: { $eq: false }
-          }
+            }}
         }).exec();
           
         const filteredTransfers = rawData.map(d => d.toJSON() as ExternalTransfer).filter(m => {
+          if ((m as any).is_deleted) return false;
           if (!selectedSection) return true;
           return animalSectionMap.get(m.animal_id) === selectedSection;
         });
@@ -357,8 +352,7 @@ export default function ReportsDashboard() {
         if (previewContainerRef.current) {
           await renderAsync(blob, previewContainerRef.current, undefined, {
             className: 'docx-preview-page',
-            inWrapper: true,
-          });
+            inWrapper: true});
         }
         return;
       } else if (activeReportId === 'site_maintenance') {
@@ -367,11 +361,9 @@ export default function ReportsDashboard() {
             date_logged: {
               $gte: startDate,
               $lte: endDate
-            },
-            is_deleted: { $eq: false }
-          }
+            }}
         }).exec();
-        const sortedData = rawData.map(d => d.toJSON() as MaintenanceLog).sort((a, b) => new Date(a.date_logged).getTime() - new Date(b.date_logged).getTime());
+        const sortedData = rawData.map(d => d.toJSON() as MaintenanceLog).filter(d => !(d as any).is_deleted).sort((a, b) => new Date(a.date_logged).getTime() - new Date(b.date_logged).getTime());
         
         const blob = await generateSiteMaintenanceDocx(
           sortedData,
@@ -388,8 +380,7 @@ export default function ReportsDashboard() {
         if (previewContainerRef.current) {
           await renderAsync(blob, previewContainerRef.current, undefined, {
             className: 'docx-preview-page',
-            inWrapper: true,
-          });
+            inWrapper: true});
         }
         return;
       } else if (activeReportId === 'census') {
@@ -433,8 +424,7 @@ export default function ReportsDashboard() {
         if (previewContainerRef.current) {
           await renderAsync(blob, previewContainerRef.current, undefined, {
             className: 'docx-preview-page',
-            inWrapper: true,
-          });
+            inWrapper: true});
         }
         return;
       } else if (activeReportId === 'stocklist') {
@@ -528,8 +518,7 @@ export default function ReportsDashboard() {
         if (previewContainerRef.current) {
           await renderAsync(blob, previewContainerRef.current, undefined, {
             className: 'docx-preview-page',
-            inWrapper: true,
-          });
+            inWrapper: true});
         }
         return;
       } else if (activeReportId === 'death_certificate') {
@@ -550,8 +539,7 @@ export default function ReportsDashboard() {
         if (previewContainerRef.current) {
           await renderAsync(blob, previewContainerRef.current, undefined, {
             className: 'docx-preview-page',
-            inWrapper: true,
-          });
+            inWrapper: true});
         }
         return;
       } else if (activeReportId === 'staff_rota') {
@@ -583,8 +571,7 @@ export default function ReportsDashboard() {
         if (previewContainerRef.current) {
           await renderAsync(blob, previewContainerRef.current, undefined, {
             className: 'docx-preview-page',
-            inWrapper: true,
-          });
+            inWrapper: true});
         }
         return;
       } else if (activeReportId === 'inspection_package') {
@@ -594,11 +581,9 @@ export default function ReportsDashboard() {
             date: {
               $gte: startDate,
               $lte: endDate
-            },
-            is_deleted: { $eq: false }
-          }
+            }}
         }).exec();
-        const medicalLogs = medicalLogsDocs.map(d => d.toJSON() as ClinicalNote);
+        const medicalLogs = medicalLogsDocs.map(d => d.toJSON() as ClinicalNote).filter(d => !(d as any).is_deleted);
 
         const marChartsDocs = await db.clinical_records.find({
           selector: {
@@ -606,22 +591,18 @@ export default function ReportsDashboard() {
             start_date: {
               $gte: startDate,
               $lte: endDate
-            },
-            is_deleted: { $eq: false }
-          }
+            }}
         }).exec();
-        const marCharts = marChartsDocs.map(d => d.toJSON() as MARChart);
+        const marCharts = marChartsDocs.map(d => d.toJSON() as MARChart).filter(d => !(d as any).is_deleted);
 
         const maintenanceLogsDocs = await db.maintenance_logs.find({
           selector: {
             date_logged: {
               $gte: startDate,
               $lte: endDate
-            },
-            is_deleted: { $eq: false }
-          }
+            }}
         }).exec();
-        const maintenanceLogs = maintenanceLogsDocs.map(d => d.toJSON() as MaintenanceLog);
+        const maintenanceLogs = maintenanceLogsDocs.map(d => d.toJSON() as MaintenanceLog).filter(d => !(d as any).is_deleted);
 
         const blob = await generateInspectionPackage(
           medicalLogs,
@@ -640,8 +621,7 @@ export default function ReportsDashboard() {
         if (previewContainerRef.current) {
           await renderAsync(blob, previewContainerRef.current, undefined, {
             className: 'docx-preview-page',
-            inWrapper: true,
-          });
+            inWrapper: true});
         }
         return;
       }

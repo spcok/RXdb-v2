@@ -18,13 +18,14 @@ export function useHolidayData() {
 
         sub = db.staff_records.find({
           selector: { 
-            is_deleted: { $eq: false },
+            
             record_type: { $eq: 'holidays' }
-          },
-          sort: [{ start_date: 'desc' }]
+          }
         }).$.subscribe(docs => {
           if (isMounted) {
-            setHolidays(docs.map(d => d.toJSON() as Holiday));
+            const rawData = docs.map(d => d.toJSON() as Holiday).filter(d => !d.is_deleted);
+            const sortedData = rawData.sort((a, b) => new Date(b.start_date || 0).getTime() - new Date(a.start_date || 0).getTime());
+            setHolidays(sortedData);
             setIsLoading(false);
           }
         });

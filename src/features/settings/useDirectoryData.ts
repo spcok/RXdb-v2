@@ -18,12 +18,12 @@ export function useDirectoryData() {
 
         sub = db.admin_records.find({
           selector: {
-            record_type: 'contact',
-            is_deleted: { $eq: false }
-          }
+            record_type: 'contact'}
         }).$.subscribe(docs => {
           if (isMounted) {
-            setContacts(docs.map(d => d.toJSON() as Contact));
+            const rawData = docs.map(d => d.toJSON() as Contact).filter(d => !(d as any).is_deleted);
+            const sortedData = rawData.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+            setContacts(sortedData);
             setIsLoading(false);
           }
         });

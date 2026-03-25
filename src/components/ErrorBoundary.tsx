@@ -9,7 +9,8 @@ interface State {
   error: Error | null;
 }
 
-export class ErrorBoundary extends Component<Props, State> {
+// 🚨 Added 'default' to the export here
+export default class ErrorBoundary extends Component<Props, State> {
   public state: State = {
     hasError: false,
     error: null

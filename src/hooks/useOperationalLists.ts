@@ -16,11 +16,9 @@ export function useOperationalLists(category: AnimalCategory = AnimalCategory.AL
         const db = coreDB || await bootCoreDatabase();
         if (!isMounted) return;
 
-        sub = db.operational_lists.find({
-          selector: { is_deleted: { $eq: false } }
-        }).$.subscribe(docs => {
+        sub = db.operational_lists.find().$.subscribe(docs => {
           if (isMounted) {
-            setLists(docs.map(d => d.toJSON() as OperationalList));
+            setLists(docs.map(d => d.toJSON() as OperationalList).filter(d => !d.is_deleted));
             setIsLoading(false);
           }
         });

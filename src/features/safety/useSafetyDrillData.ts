@@ -16,12 +16,11 @@ export function useSafetyDrillData() {
         const db = coreDB || await bootCoreDatabase();
         if (!isMounted) return;
 
-        sub = db.safety_drills.find({
-          selector: { is_deleted: { $eq: false } },
-          sort: [{ date: 'desc' }]
-        }).$.subscribe(docs => {
+        sub = db.safety_drills.find().$.subscribe(docs => {
           if (isMounted) {
-            setDrills(docs.map(d => d.toJSON() as SafetyDrill));
+            const rawData = docs.map(d => d.toJSON() as SafetyDrill).filter(d => !d.is_deleted);
+            const sortedData = rawData.sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
+            setDrills(sortedData);
             setIsLoading(false);
           }
         });

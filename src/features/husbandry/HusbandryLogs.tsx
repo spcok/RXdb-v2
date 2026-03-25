@@ -32,13 +32,10 @@ export const HusbandryLogs: React.FC<Props> = ({ animalId, animal }) => {
         sub = db.daily_records.find({
           selector: {
             animal_id: animalId,
-            log_type: { $in: validHusbandryTypes },
-            is_deleted: { $eq: false }
-          },
-          sort: [{ log_date: 'desc' }]
+            log_type: { $in: validHusbandryTypes }}
         }).$.subscribe(docs => {
           if (isMounted) {
-            setLogs(docs.map(d => d.toJSON() as LogEntry));
+            setLogs(docs.map(d => d.toJSON() as LogEntry).filter(d => !d.is_deleted));
             setLoading(false);
           }
         });

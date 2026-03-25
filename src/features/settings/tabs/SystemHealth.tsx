@@ -34,7 +34,7 @@ const SystemHealth: React.FC = () => {
       const collections = Object.keys(db.collections);
       for (const colName of collections) {
         const docs = await db.collections[colName].find().exec();
-        exportData[colName] = docs.map(d => d.toJSON());
+        exportData[colName] = docs.map(d => d.toJSON()).filter(d => !d.is_deleted);
       }
       
       const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });

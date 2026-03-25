@@ -18,12 +18,14 @@ export const useRotaData = () => {
 
         sub = db.staff_records.find({
           selector: { 
-            is_deleted: { $eq: false },
+            
             record_type: { $eq: 'shifts' }
           }
         }).$.subscribe(docs => {
           if (isMounted) {
-            setShifts(docs.map(d => d.toJSON() as Shift));
+            const rawData = docs.map(d => d.toJSON() as Shift).filter(d => !d.is_deleted);
+            const sortedData = rawData.sort((a, b) => new Date(a.date || 0).getTime() - new Date(b.date || 0).getTime());
+            setShifts(sortedData);
             setIsLoading(false);
           }
         });
@@ -94,7 +96,7 @@ export const useRotaData = () => {
       const seriesShifts = await db.staff_records.find({
         selector: { 
           pattern_id: { $eq: updates.pattern_id },
-          is_deleted: { $eq: false },
+          
           record_type: { $eq: 'shifts' }
         }
       }).exec();
@@ -131,7 +133,7 @@ export const useRotaData = () => {
         selector: {
           pattern_id: { $eq: existingShift.pattern_id },
           date: { $gte: existingShift.date },
-          is_deleted: { $eq: false },
+          
           record_type: { $eq: 'shifts' }
         }
       }).exec();
@@ -162,7 +164,7 @@ export const useRotaData = () => {
       const seriesShifts = await db.staff_records.find({
         selector: {
           pattern_id: { $eq: shift.pattern_id },
-          is_deleted: { $eq: false },
+          
           record_type: { $eq: 'shifts' }
         }
       }).exec();

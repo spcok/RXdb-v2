@@ -18,12 +18,12 @@ export function useZLADocsData() {
 
         sub = db.admin_records.find({
           selector: {
-            record_type: 'zla_document',
-            is_deleted: { $eq: false }
-          }
+            record_type: 'zla_document'}
         }).$.subscribe(docs => {
           if (isMounted) {
-            setDocuments(docs.map(d => d.toJSON() as ZLADocument));
+            const rawData = docs.map(d => d.toJSON() as ZLADocument).filter(d => !(d as any).is_deleted);
+            const sortedData = rawData.sort((a, b) => new Date((b as any).created_at || 0).getTime() - new Date((a as any).created_at || 0).getTime());
+            setDocuments(sortedData);
             setIsLoading(false);
           }
         });

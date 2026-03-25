@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { AnimalCategory, DailyRound, Animal, LogType, LogEntry, EntityType } from '../../types';
+import { AnimalCategory, DailyRound, Animal, LogType, LogEntry } from '../../types';
 import { coreDB, bootCoreDatabase } from '../../lib/DatabaseCore';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -67,7 +67,7 @@ export function useDailyRoundData(viewDate: string) {
                     }).$.subscribe(docs => {
                         if (isMounted) {
                             const rawData = docs.map(d => d.toJSON() as DailyRound);
-                            setLiveRounds(rawData.filter(r => !r.is_deleted));
+                            setLiveRounds(rawData.filter(r => !(r as any).is_deleted));
                             setIsLoading(false);
                         }
                     })
@@ -120,9 +120,24 @@ export function useDailyRoundData(viewDate: string) {
         return risks;
     }, [categoryAnimals, liveLogs]);
 
-    const toggleHealth = (id: string, issue?: string) => { /* logic unchanged */ };
-    const toggleWater = (id: string) => { /* logic unchanged */ };
-    const toggleSecure = (id: string, issue?: string) => { /* logic unchanged */ };
+    const toggleHealth = (id: string, issue?: string) => { 
+        setChecks(prev => ({
+            ...prev,
+            [id]: { ...prev[id], isAlive: prev[id]?.isAlive ? undefined : true, healthIssue: issue }
+        }));
+    };
+    const toggleWater = (id: string) => { 
+        setChecks(prev => ({
+            ...prev,
+            [id]: { ...prev[id], isWatered: !prev[id]?.isWatered }
+        }));
+    };
+    const toggleSecure = (id: string, issue?: string) => { 
+        setChecks(prev => ({
+            ...prev,
+            [id]: { ...prev[id], isSecure: !prev[id]?.isSecure, securityIssue: issue }
+        }));
+    };
 
     const completedChecks = useMemo(() => {
         return categoryAnimals.filter(animal => {

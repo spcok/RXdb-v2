@@ -18,13 +18,14 @@ export function useMovementsData() {
 
         sub = db.logistics_records.find({
           selector: { 
-            is_deleted: { $eq: false },
+            
             record_type: { $eq: 'movements' }
-          },
-          sort: [{ log_date: 'desc' }]
+          }
         }).$.subscribe(docs => {
           if (isMounted) {
-            setMovements(docs.map(d => d.toJSON() as InternalMovement));
+            const rawData = docs.map(d => d.toJSON() as InternalMovement).filter(d => !d.is_deleted);
+            const sortedData = rawData.sort((a, b) => new Date(b.log_date || 0).getTime() - new Date(a.log_date || 0).getTime());
+            setMovements(sortedData);
             setIsLoading(false);
           }
         });

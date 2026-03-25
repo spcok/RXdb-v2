@@ -18,13 +18,14 @@ export function useTimesheetData() {
 
         sub = db.staff_records.find({
           selector: { 
-            is_deleted: { $eq: false },
+            
             record_type: { $eq: 'timesheets' }
-          },
-          sort: [{ date: 'desc' }]
+          }
         }).$.subscribe(docs => {
           if (isMounted) {
-            setTimesheets(docs.map(d => d.toJSON() as Timesheet));
+            const rawData = docs.map(d => d.toJSON() as Timesheet).filter(d => !d.is_deleted);
+            const sortedData = rawData.sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
+            setTimesheets(sortedData);
             setIsLoading(false);
           }
         });
@@ -77,7 +78,7 @@ export function useTimesheetData() {
     const active = await db.staff_records.find({
       selector: { 
         status: { $eq: TimesheetStatus.ACTIVE },
-        is_deleted: { $eq: false },
+        
         record_type: { $eq: 'timesheets' }
       }
     }).exec();

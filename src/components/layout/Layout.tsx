@@ -1,90 +1,34 @@
-import React, { useState, useEffect } from 'react';
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import {
-  LayoutDashboard, ClipboardList, ListTodo, Map, CloudSun, CalendarDays,
-  ArrowLeftRight, ShieldAlert, Stethoscope, Heart, Wrench,
-  AlertOctagon, Clock, Settings as SettingsIcon, LogOut, Menu, Power, X,
-  ChevronLeft, ChevronRight,
-  HelpCircle, FileText, Calendar, ClipboardCheck, Wifi, WifiOff, ShieldCheck,
-  ZoomIn, ZoomOut, Utensils
-} from 'lucide-react';
-import { useAuthStore } from '../../store/authStore';
+import { useState, useEffect } from 'react';
+import { Outlet, useNavigate, useLocation, Link } from 'react-router-dom';
 import { usePermissions } from '../../hooks/usePermissions';
-import { useAppData } from '../../context/Context';
-import { useOrgSettings } from '../../features/settings/useOrgSettings';
-import GlobalBugReporter from '../ui/GlobalBugReporter';
-import { useNetworkStatus } from '../../hooks/useNetworkStatus';
-import { UpdateBanner } from './UpdateBanner';
-import { InstallButton } from '../ui/InstallButton';
+import { useAuthStore } from '../../store/authStore';
+import { 
+  LayoutDashboard, ClipboardList, CheckSquare, CalendarDays, 
+  Stethoscope, ArrowRightLeft, Plane, Wrench, AlertTriangle, 
+  Cross, ShieldAlert, Clock, Calendar, Users, FileCheck, 
+  BarChart2, Settings, HelpCircle, LogOut, Menu, X, ChevronLeft, ChevronRight
+} from 'lucide-react';
 
-interface LayoutProps {
-  fontScale?: number;
-  setFontScale?: (scale: number) => void;
-}
-
-const NavItem = ({ to, icon: Icon, label, permission, isSidebarCollapsed, setIsMobileMenuOpen }: { 
-  to: string, 
-  icon: React.ElementType, 
-  label: string, 
-  permission: boolean,
-  isSidebarCollapsed: boolean,
-  setIsMobileMenuOpen: (open: boolean) => void
-}) => {
-  if (!permission) return null;
-  return (
-    <NavLink
-      to={to}
-      onClick={() => setIsMobileMenuOpen(false)}
-      title={isSidebarCollapsed ? String(label) : ''}
-      className={({ isActive }) => `flex items-center gap-3 px-4 py-2.5 transition-all duration-200 group relative w-full ${
-        isActive
-          ? 'bg-emerald-500/10 text-emerald-400 border-r-4 border-emerald-500'
-          : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200 border-r-4 border-transparent'
-      } ${isSidebarCollapsed ? 'justify-center px-0 border-r-0' : ''}`}
-    >
-      {({ isActive }) => (
-        <>
-          <Icon size={20} className={`transition-colors shrink-0 ${isActive ? 'text-emerald-400' : 'text-slate-500 group-hover:text-slate-300'}`} />
-          {!isSidebarCollapsed && <span className="whitespace-nowrap overflow-hidden text-sm font-medium">{String(label)}</span>}
-          {isSidebarCollapsed && isActive && <div className="absolute right-0 top-0 bottom-0 w-1 bg-emerald-500 rounded-l"></div>}
-        </>
-      )}
-    </NavLink>
-  );
-};
-
-const SectionHeader = ({ title, isSidebarCollapsed }: { title: string, isSidebarCollapsed: boolean }) => {
-  if (isSidebarCollapsed) return <div className="h-4"></div>;
-  return (
-    <div className="px-6 pt-6 pb-2 text-left">
-      <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest truncate">{String(title)}</p>
-    </div>
-  );
-};
-
-const Layout: React.FC<LayoutProps> = () => {
+export default function Layout() {
+  const navigate = useNavigate();
+  const location = useLocation();
   const { currentUser, logout } = useAuthStore();
-  const permissions = usePermissions(); // 🔥 RESTORED
-  
+  const permissions = usePermissions();
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
   const { 
+    isLoading,
     view_daily_logs, view_tasks, view_medical, view_movements, 
     view_daily_rounds, view_maintenance, view_incidents, 
     view_first_aid, view_safety_drills, submit_timesheets, 
     request_holidays, view_missing_records, generate_reports, 
     view_settings 
   } = permissions;
-  
-  const { activeShift, clockIn, clockOut } = useAppData();
-  const { settings: orgSettings } = useOrgSettings(); // 🔥 RESTORED
-  const { isOnline } = useNetworkStatus();
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const [fontSize, setFontSize] = useState<'small' | 'medium' | 'large' | 'xlarge'>('medium');
-  const location = useLocation();
-  const navigate = useNavigate();
 
   useEffect(() => {
+    if (isLoading) return; 
+
     const path = location.pathname;
     let isAllowed = true;
 
@@ -105,258 +49,146 @@ const Layout: React.FC<LayoutProps> = () => {
 
     if (!isAllowed) {
       console.warn('🛠️ [Security QA] Unauthorized route access blocked.');
-      alert('Unauthorized Access');
       navigate('/', { replace: true });
     }
   }, [
-    location.pathname, navigate, view_medical, view_daily_logs, view_tasks, 
+    location.pathname, navigate, isLoading, view_medical, view_daily_logs, view_tasks, 
     view_daily_rounds, view_movements, view_maintenance, view_incidents, 
     view_first_aid, view_safety_drills, submit_timesheets, request_holidays, 
     view_missing_records, generate_reports, view_settings
   ]);
 
-  const increaseTextSize = () => {
-    const sizes: ('small' | 'medium' | 'large' | 'xlarge')[] = ['small', 'medium', 'large', 'xlarge'];
-    const currentIndex = sizes.indexOf(fontSize);
-    if (currentIndex < sizes.length - 1) setFontSize(sizes[currentIndex + 1]);
-  };
-
-  const decreaseTextSize = () => {
-    const sizes: ('small' | 'medium' | 'large' | 'xlarge')[] = ['small', 'medium', 'large', 'xlarge'];
-    const currentIndex = sizes.indexOf(fontSize);
-    if (currentIndex > 0) setFontSize(sizes[currentIndex - 1]);
-  };
-
-  useEffect(() => {
-    const root = document.documentElement;
-    if (fontSize === 'small') root.style.fontSize = '14px';
-    else if (fontSize === 'large') root.style.fontSize = '18px';
-    else if (fontSize === 'xlarge') root.style.fontSize = '20px';
-    else root.style.fontSize = '16px';
-  }, [fontSize]);
-
-  const handleLogout = async () => {
-    logout();
-  }
-
-  const sidebarContent = (
-    <div className={`flex flex-col h-full bg-[#1c1c1e] text-slate-300 transition-all duration-300 ${isSidebarCollapsed ? 'w-20' : 'w-64'} no-print shadow-xl md:shadow-none`}>
-      <div className={`h-14 flex items-center ${isSidebarCollapsed ? 'justify-center' : 'justify-between px-4'} border-b border-slate-800`}>
-        {!isSidebarCollapsed && <span className="font-bold text-white tracking-tight">KOA Manager</span>}
-        <div className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/10 overflow-hidden shrink-0">
-          {orgSettings?.logo_url ? (
-            <img 
-              src={orgSettings.logo_url} 
-              alt="Logo" 
-              className="w-full h-full object-contain" 
-              referrerPolicy="no-referrer" 
-            />
-          ) : (
-            <ShieldCheck size={20} className="text-emerald-500" />
-          )}
-        </div>
-      </div>
-      <div className={`px-4 py-2 border-b border-slate-800/50 flex items-center gap-2 ${!isOnline ? 'bg-rose-900/20' : 'bg-emerald-900/10'}`}>
-        {isOnline ? <Wifi size={14} className="text-emerald-500" /> : <WifiOff size={14} className="text-rose-500" />}
-        {!isSidebarCollapsed && (
-          <span className={`text-[9px] font-black uppercase tracking-widest ${!isOnline ? 'text-rose-500' : 'text-emerald-500/70'}`}>
-            {isOnline ? 'Online' : 'Offline'}
-          </span>
-        )}
-      </div>
-      <div className="flex-1 overflow-y-auto py-2 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
-        <SectionHeader title="Main Menu" isSidebarCollapsed={isSidebarCollapsed} />
-        <NavItem to="/" icon={LayoutDashboard} label="Dashboard" permission={true} isSidebarCollapsed={isSidebarCollapsed} setIsMobileMenuOpen={setIsMobileMenuOpen} />
-        <NavItem to="/weather" icon={CloudSun} label="Weather" permission={true} isSidebarCollapsed={isSidebarCollapsed} setIsMobileMenuOpen={setIsMobileMenuOpen} />
-        <NavItem to="/daily-log" icon={ClipboardList} label="Daily Log" permission={!!view_daily_logs} isSidebarCollapsed={isSidebarCollapsed} setIsMobileMenuOpen={setIsMobileMenuOpen} />
-        <NavItem to="/daily-rounds" icon={ClipboardCheck} label="Daily Rounds" permission={!!view_daily_rounds} isSidebarCollapsed={isSidebarCollapsed} setIsMobileMenuOpen={setIsMobileMenuOpen} />
-        <NavItem to="/tasks" icon={ListTodo} label="To-Do List" permission={!!view_tasks} isSidebarCollapsed={isSidebarCollapsed} setIsMobileMenuOpen={setIsMobileMenuOpen} />
-        <NavItem to="/feeding-schedule" icon={Utensils} label="Feeding Schedule" permission={true} isSidebarCollapsed={isSidebarCollapsed} setIsMobileMenuOpen={setIsMobileMenuOpen} />
-
-        <SectionHeader title="Animal Care" isSidebarCollapsed={isSidebarCollapsed} />
-        <NavItem to="/medical" icon={Stethoscope} label="Medical Records" permission={!!view_medical} isSidebarCollapsed={isSidebarCollapsed} setIsMobileMenuOpen={setIsMobileMenuOpen} />
-        <NavItem to="/movements" icon={ArrowLeftRight} label="Movements" permission={!!view_movements} isSidebarCollapsed={isSidebarCollapsed} setIsMobileMenuOpen={setIsMobileMenuOpen} />
-        <NavItem to="/flight-records" icon={Map} label="Flight Records" permission={true} isSidebarCollapsed={isSidebarCollapsed} setIsMobileMenuOpen={setIsMobileMenuOpen} />
-
-        <SectionHeader title="Site & Safety" isSidebarCollapsed={isSidebarCollapsed} />
-        <NavItem to="/maintenance" icon={Wrench} label="Site Maintenance" permission={!!view_maintenance} isSidebarCollapsed={isSidebarCollapsed} setIsMobileMenuOpen={setIsMobileMenuOpen} />
-        <NavItem to="/incidents" icon={ShieldAlert} label="Incident Reports" permission={!!view_incidents} isSidebarCollapsed={isSidebarCollapsed} setIsMobileMenuOpen={setIsMobileMenuOpen} />
-        <NavItem to="/first-aid" icon={Heart} label="First Aid Log" permission={!!view_first_aid} isSidebarCollapsed={isSidebarCollapsed} setIsMobileMenuOpen={setIsMobileMenuOpen} />
-        <NavItem to="/safety-drills" icon={AlertOctagon} label="Safety Drills" permission={!!view_safety_drills} isSidebarCollapsed={isSidebarCollapsed} setIsMobileMenuOpen={setIsMobileMenuOpen} />
-
-        <SectionHeader title="Staff" isSidebarCollapsed={isSidebarCollapsed} />
-        <NavItem to="/timesheets" icon={Clock} label="Time Sheets" permission={!!submit_timesheets} isSidebarCollapsed={isSidebarCollapsed} setIsMobileMenuOpen={setIsMobileMenuOpen} />
-        <NavItem to="/holidays" icon={Calendar} label="Holiday Registry" permission={!!request_holidays} isSidebarCollapsed={isSidebarCollapsed} setIsMobileMenuOpen={setIsMobileMenuOpen} />
-        <NavItem to="/rota" icon={CalendarDays} label="Staff Rota" permission={true} isSidebarCollapsed={isSidebarCollapsed} setIsMobileMenuOpen={setIsMobileMenuOpen} />
-
-        <SectionHeader title="Compliance" isSidebarCollapsed={isSidebarCollapsed} />
-        <NavItem to="/compliance" icon={ShieldCheck} label="ZLA Compliance" permission={!!view_missing_records} isSidebarCollapsed={isSidebarCollapsed} setIsMobileMenuOpen={setIsMobileMenuOpen} />
-        <NavItem to="/reports" icon={FileText} label="Reports" permission={!!generate_reports} isSidebarCollapsed={isSidebarCollapsed} setIsMobileMenuOpen={setIsMobileMenuOpen} />
-
-        <SectionHeader title="System" isSidebarCollapsed={isSidebarCollapsed} />
-        <NavItem to="/settings" icon={SettingsIcon} label="Settings" permission={!!view_settings} isSidebarCollapsed={isSidebarCollapsed} setIsMobileMenuOpen={setIsMobileMenuOpen} />
-        <NavItem to="/help" icon={HelpCircle} label="Help & Support" permission={true} isSidebarCollapsed={isSidebarCollapsed} setIsMobileMenuOpen={setIsMobileMenuOpen} />
-
-        {/* Text Size Controls */}
-        <div className={`px-4 py-4 mt-4 border-t border-slate-800/30 ${isSidebarCollapsed ? 'flex flex-col items-center gap-2' : 'flex items-center justify-between'}`}>
-          {!isSidebarCollapsed && <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Text Size</span>}
-          <div className="flex items-center gap-1">
-            <button 
-              onClick={decreaseTextSize} 
-              className="p-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
-              title="Decrease Text Size"
-            >
-              <ZoomOut size={14} />
-            </button>
-            <button 
-              onClick={increaseTextSize} 
-              className="p-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
-              title="Increase Text Size"
-            >
-              <ZoomIn size={14} />
-            </button>
-          </div>
-        </div>
-      </div>
-      <div className="p-4 border-t border-slate-800/50 bg-[#18181a]">
-        {!isSidebarCollapsed ? (
-          <>
-            <div className="mb-4 hidden md:flex justify-center">
-              <InstallButton />
-            </div>
-            <div className="flex items-center gap-3 mb-4 px-2">
-              <div className="w-9 h-9 rounded-full bg-slate-700 flex items-center justify-center font-black text-xs text-white border border-slate-600 shrink-0">
-                {String(currentUser?.initials || '--')}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-bold text-white truncate text-left">{String(currentUser?.name || 'Unknown')}</p>
-                <p className="text-[9px] font-black text-emerald-500 truncate uppercase tracking-widest text-left">{String(currentUser?.job_position || currentUser?.role || 'Guest')}</p>
-              </div>
-              <button onClick={handleLogout} className="text-slate-500 hover:text-red-400 transition-colors"><LogOut size={16}/></button>
-            </div>
-            {activeShift ? (
-              <button onClick={() => { console.log('Clock Out clicked'); clockOut(); }} className="w-full bg-amber-500/10 border border-amber-500/50 text-amber-500 rounded-lg py-2 text-xs font-bold flex items-center justify-center gap-2 hover:bg-amber-500/20 transition-all">
-                <Power size={14}/> CLOCK OUT
-              </button>
-            ) : (
-              <button onClick={() => { console.log('Clock In clicked'); clockIn(String(currentUser?.initials || '')); }} className="w-full bg-emerald-600 text-white rounded-lg py-2 text-xs font-bold flex items-center justify-center gap-2 hover:bg-emerald-500 transition-all shadow-lg shadow-emerald-900/20">
-                <Clock size={14}/> START SHIFT
-              </button>
-            )}
-          </>
-        ) : (
-          <div className="flex flex-col items-center gap-4">
-            <div className="hidden md:flex">
-              <InstallButton />
-            </div>
-            <button onClick={handleLogout} className="w-9 h-9 rounded-full bg-slate-800 flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-700 transition-colors" title="Logout">
-              <LogOut size={16}/>
-            </button>
-            {activeShift ? (
-              <button onClick={() => { console.log('Clock Out clicked'); clockOut(); }} className="w-9 h-9 rounded-lg bg-amber-500/20 text-amber-500 flex items-center justify-center hover:bg-amber-500/30 transition-colors" title="Clock Out">
-                <Power size={16}/>
-              </button>
-            ) : (
-              <button onClick={() => { console.log('Clock In clicked'); clockIn(String(currentUser?.initials || '')); }} className="w-9 h-9 rounded-lg bg-emerald-600 text-white flex items-center justify-center hover:bg-emerald-500 transition-colors" title="Clock In">
-                <Clock size={16}/>
-              </button>
-            )}
-          </div>
-        )}
-      </div>
-      <button
-        onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-        className="w-full h-8 bg-[#151516] flex items-center justify-center text-slate-500 hover:text-slate-200 hover:bg-slate-800 transition-colors border-t border-slate-800"
-      >
-        {isSidebarCollapsed ? <ChevronRight size={14}/> : <ChevronLeft size={14}/>}
-      </button>
-    </div>
-  );
+  const navItems = [
+    { name: 'Dashboard', path: '/', icon: LayoutDashboard, show: true },
+    { name: 'Daily Log', path: '/daily-log', icon: ClipboardList, show: view_daily_logs },
+    { name: 'Daily Rounds', path: '/daily-rounds', icon: CheckSquare, show: view_daily_rounds },
+    { name: 'Tasks', path: '/tasks', icon: CheckSquare, show: view_tasks },
+    { name: 'Feeding Schedule', path: '/feeding-schedule', icon: CalendarDays, show: true },
+    { name: 'Animals', path: '/animals', icon: ClipboardList, show: true },
+    { name: 'Medical', path: '/medical', icon: Stethoscope, show: view_medical },
+    { name: 'Movements', path: '/movements', icon: ArrowRightLeft, show: view_movements },
+    { name: 'Flight Records', path: '/flight-records', icon: Plane, show: true },
+    { name: 'Maintenance', path: '/maintenance', icon: Wrench, show: view_maintenance },
+    { name: 'Incidents', path: '/incidents', icon: AlertTriangle, show: view_incidents },
+    { name: 'First Aid', path: '/first-aid', icon: Cross, show: view_first_aid },
+    { name: 'Safety Drills', path: '/safety-drills', icon: ShieldAlert, show: view_safety_drills },
+    { name: 'Timesheets', path: '/timesheets', icon: Clock, show: submit_timesheets },
+    { name: 'Holidays', path: '/holidays', icon: Calendar, show: request_holidays },
+    { name: 'Rota', path: '/rota', icon: Users, show: true },
+    { name: 'Compliance', path: '/compliance', icon: FileCheck, show: view_missing_records },
+    { name: 'Reports', path: '/reports', icon: BarChart2, show: generate_reports },
+    { name: 'Settings', path: '/settings', icon: Settings, show: view_settings },
+    { name: 'Help', path: '/help', icon: HelpCircle, show: true },
+  ];
 
   return (
-    <div className="flex h-screen bg-[#f3f4f6] overflow-hidden font-sans selection:bg-emerald-500/30 selection:text-emerald-900">
-      {/* Mobile Backdrop */}
+    <div className="flex h-screen bg-gray-100">
+      {/* Mobile Menu Overlay */}
       {isMobileMenuOpen && (
         <div 
-          className="fixed inset-0 bg-black/60 z-[70] md:hidden backdrop-blur-sm transition-opacity animate-in fade-in duration-300" 
-          onClick={() => setIsMobileMenuOpen(false)} 
+          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          onClick={() => setIsMobileMenuOpen(false)}
         />
       )}
 
       {/* Sidebar */}
       <aside 
-        className={`fixed inset-y-0 left-0 z-[80] transform transition-all duration-300 ease-in-out md:static md:translate-x-0 ${
-          isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
-        } no-print`}
+        className={`
+          fixed md:static inset-y-0 left-0 z-50
+          bg-slate-900 text-slate-300
+          transition-all duration-300 ease-in-out
+          ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+          ${isSidebarCollapsed ? 'md:w-20' : 'md:w-64'}
+          w-64 flex flex-col
+        `}
       >
-        <div className="relative h-full">
-          {/* Mobile Close Button */}
-          {isMobileMenuOpen && (
-            <button 
-              onClick={() => setIsMobileMenuOpen(false)}
-              className="absolute top-4 -right-12 p-2 bg-slate-900 text-white rounded-lg md:hidden shadow-xl"
-            >
-              <X size={20} />
-            </button>
-          )}
-          {sidebarContent}
+        <div className="flex items-center justify-between h-16 px-4 bg-slate-950">
+          {!isSidebarCollapsed && <span className="text-xl font-bold text-white">KOA Manager</span>}
+          {isSidebarCollapsed && <span className="text-xl font-bold text-white mx-auto">KM</span>}
+          <button 
+            className="md:hidden text-slate-400 hover:text-white"
+            onClick={() => setIsMobileMenuOpen(false)}
+          >
+            <X size={24} />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto py-4">
+          <nav className="space-y-1 px-2">
+            {navItems.filter(item => item.show).map((item) => {
+              const isActive = location.pathname === item.path || 
+                (item.path !== '/' && location.pathname.startsWith(item.path));
+              return (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className={`
+                    flex items-center px-3 py-2 rounded-md transition-colors
+                    ${isActive 
+                      ? 'bg-emerald-600 text-white' 
+                      : 'hover:bg-slate-800 hover:text-white'
+                    }
+                    ${isSidebarCollapsed ? 'justify-center' : ''}
+                  `}
+                  title={isSidebarCollapsed ? item.name : undefined}
+                >
+                  <item.icon size={20} className={isSidebarCollapsed ? '' : 'mr-3'} />
+                  {!isSidebarCollapsed && <span>{item.name}</span>}
+                </Link>
+              );
+            })}
+          </nav>
+        </div>
+
+        <div className="p-4 bg-slate-950">
+          <button
+            onClick={logout}
+            className={`
+              flex items-center w-full px-3 py-2 rounded-md text-slate-400 hover:bg-slate-800 hover:text-white transition-colors
+              ${isSidebarCollapsed ? 'justify-center' : ''}
+            `}
+            title={isSidebarCollapsed ? "Logout" : undefined}
+          >
+            <LogOut size={20} className={isSidebarCollapsed ? '' : 'mr-3'} />
+            {!isSidebarCollapsed && <span>Logout</span>}
+          </button>
         </div>
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col min-w-0 relative overflow-x-hidden print:overflow-visible">
-        {/* Update Banner */}
-        <UpdateBanner />
-
-        {/* Mobile Top Navbar */}
-        <header className="md:hidden h-16 bg-[#1c1c1e] border-b border-slate-800 flex items-center justify-between px-4 z-50 no-print shadow-lg shrink-0">
-          <div className="flex items-center gap-3">
-            <button 
-              onClick={() => setIsMobileMenuOpen(true)} 
-              className="text-slate-300 p-2 -ml-2 hover:bg-slate-800 rounded-lg transition-colors active:scale-90"
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {/* Header */}
+        <header className="bg-white shadow-sm h-16 flex items-center justify-between px-4 z-10">
+          <div className="flex items-center">
+            <button
+              className="md:hidden p-2 mr-2 text-slate-600 hover:bg-slate-100 rounded-md"
+              onClick={() => setIsMobileMenuOpen(true)}
             >
               <Menu size={24} />
             </button>
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/10 overflow-hidden shrink-0">
-                {orgSettings?.logo_url ? (
-                  <img 
-                    src={orgSettings.logo_url} 
-                    alt="Logo" 
-                    className="w-full h-full object-contain" 
-                    referrerPolicy="no-referrer" 
-                  />
-                ) : (
-                  <ShieldCheck size={20} className="text-emerald-500" />
-                )}
-              </div>
-              <span className="text-sm font-bold text-white tracking-tight uppercase">KOA Manager</span>
-            </div>
+            <button
+              className="hidden md:block p-2 text-slate-600 hover:bg-slate-100 rounded-md"
+              onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+            >
+              {isSidebarCollapsed ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
+            </button>
           </div>
-          <div className="flex items-center gap-3">
-            <InstallButton />
-            <div className="w-8 h-8 bg-slate-700 rounded-full flex items-center justify-center font-black text-[10px] text-white border border-slate-600 shadow-inner">
-              {String(currentUser?.initials || '--')}
+          <div className="flex items-center space-x-4">
+            <span className="text-sm font-medium text-slate-700">
+              {currentUser?.name || currentUser?.email}
+            </span>
+            <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
+              {currentUser?.name ? currentUser.name.charAt(0).toUpperCase() : 'U'}
             </div>
           </div>
         </header>
 
-        {/* Offline Banner */}
-        {!isOnline && (
-          <div className="bg-amber-500 text-slate-900 z-[60] flex items-center justify-center gap-2 py-2 px-4 text-[10px] font-black uppercase tracking-[0.2em] shrink-0 text-center">
-            <WifiOff size={12} />
-            Offline Mode: Changes will be saved locally.
-          </div>
-        )}
-
-        {/* Content Area - STRICT ENTERPRISE FRAME */}
-        <div className="flex-1 overflow-y-auto bg-slate-200 print:bg-white print:overflow-visible p-2 md:p-4 pb-24 md:pb-6 lg:pb-8 w-full">
+        {/* Page Content */}
+        <main className="flex-1 overflow-y-auto p-4 md:p-6 bg-slate-50">
           <Outlet context={{ isSidebarCollapsed }} />
-        </div>
-      </main>
-      <GlobalBugReporter />
+        </main>
+      </div>
     </div>
   );
-};
-
-export default Layout;
+}
