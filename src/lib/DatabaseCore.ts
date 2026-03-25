@@ -2,7 +2,6 @@ import { createRxDatabase, RxDatabase } from 'rxdb';
 import { getRxStorageDexie } from 'rxdb/plugins/storage-dexie';
 import { replicateSupabase, RxSupabaseReplicationState } from 'rxdb/plugins/replication-supabase';
 
-// 🔥 THE IMMORTAL PATTERN
 const GLOBALS = globalThis as any;
 
 export let coreDB: RxDatabase | null = GLOBALS.__KOA_IMMORTAL_DB || null;
@@ -39,9 +38,7 @@ const listKeys = ['type', 'category', 'value'];
 const taskKeys = ['animal_id', 'title', 'due_date', 'completed', 'assigned_to', 'type', 'notes'];
 
 export const bootCoreDatabase = (): Promise<RxDatabase> => {
-  if (GLOBALS.__KOA_IMMORTAL_PROMISE) {
-    return GLOBALS.__KOA_IMMORTAL_PROMISE;
-  }
+  if (GLOBALS.__KOA_IMMORTAL_PROMISE) return GLOBALS.__KOA_IMMORTAL_PROMISE;
 
   console.log(`🛡️ [Core DB] Booting Immortal Engine...`);
 
@@ -86,51 +83,10 @@ if (!GLOBALS.__koa_activeReplications) {
 }
 const activeReplications: RxSupabaseReplicationState<unknown>[] = GLOBALS.__koa_activeReplications;
 
-const createSafeSupabaseClient = (client: any) => {
-  return new Proxy(client, {
-    get(target, prop) {
-      if (prop === 'from') {
-        return (table: string) => {
-          const queryObj = target.from(table);
-          return new Proxy(queryObj, {
-            get(qTarget, qProp) {
-              if (qProp === 'select') {
-                return (...args: any[]) => {
-                  const builder = qTarget.select(...args);
-                  const originalThen = builder.then.bind(builder);
-                  
-                  builder.then = (onFulfilled: any, onRejected: any) => {
-                    return originalThen((response: any) => {
-                      if (response?.data && Array.isArray(response.data)) {
-                        response.data = response.data.map((row: any) => {
-                          const cleanRow = { ...row };
-                          if (!cleanRow.id) cleanRow.id = crypto.randomUUID();
-                          return cleanRow;
-                        });
-                      }
-                      return onFulfilled ? onFulfilled(response) : response;
-                    }, onRejected);
-                  };
-                  return builder;
-                };
-              }
-              const value = qTarget[qProp as keyof typeof qTarget];
-              return typeof value === 'function' ? value.bind(qTarget) : value;
-            }
-          });
-        };
-      }
-      return target[prop as keyof typeof target];
-    }
-  });
-};
-
 export const startCoreSync = async (db: RxDatabase, realSupabaseClient: any) => {
   if (!db || !realSupabaseClient) return;
 
-  console.log('🔗 [Core DB] Engaging Official Authenticated Sync (Protected)...');
-
-  const safeSupabaseClient = createSafeSupabaseClient(realSupabaseClient);
+  console.log('🔗 [Core DB] Engaging Pure Native Sync (No Proxies)...');
 
   activeReplications.forEach(state => state.cancel());
   activeReplications.length = 0;
@@ -143,19 +99,17 @@ export const startCoreSync = async (db: RxDatabase, realSupabaseClient: any) => 
       try {
         const state = replicateSupabase({
           collection,
-          replicationIdentifier: `core_${colName}_${config.table}_sync_final`,
-          client: safeSupabaseClient,
+          replicationIdentifier: `core_${colName}_${config.table}_sync_v6`, // 🚨 Master Reset v6
+          client: realSupabaseClient, // 🚨 Passed pure and untouched
           tableName: config.table,
           deletedField: 'is_deleted',
           pull: { 
             batchSize: 100, 
             modifier: (doc: any) => {
               const cleanDoc = { ...doc };
-              Object.keys(cleanDoc).forEach(key => {
-                if (cleanDoc[key] === null) delete cleanDoc[key];
-              });
-              if (!cleanDoc.id) cleanDoc.id = cleanDoc.role || cleanDoc.name || cleanDoc.type || crypto.randomUUID();
-              return { ...cleanDoc, id: String(cleanDoc.id), record_type: config.type };
+              // We can still use the native modifier to clean incoming data!
+              if (!cleanDoc.id) cleanDoc.id = crypto.randomUUID(); 
+              return { ...cleanDoc, id: String(cleanDoc.id), record_type: config.type, is_deleted: !!cleanDoc.is_deleted };
             } 
           },
           push: { 
@@ -164,14 +118,12 @@ export const startCoreSync = async (db: RxDatabase, realSupabaseClient: any) => 
               
               const cleanDoc = { ...doc };
               
-              // Remove RxDB's hidden state variables
+              // Stripping internal states for PostgREST compatibility
               delete cleanDoc._deleted;
               delete cleanDoc._attachments;
               delete cleanDoc._rev;
               delete cleanDoc._meta;
-              
-              // 🚨 NEW: Strip the local routing label so Supabase accepts the payload
-              delete cleanDoc.record_type;
+              delete cleanDoc.record_type; 
               
               return cleanDoc;
             } 

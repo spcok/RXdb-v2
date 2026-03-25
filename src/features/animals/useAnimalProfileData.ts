@@ -24,48 +24,47 @@ export function useAnimalProfileData(animalId: string | undefined) {
         if (!isMounted) return;
 
         subs = [
-          // 1. Animal Details
-          db.animals.find({
-            selector: { record_type: 'animals' }
-          }).$.subscribe(docs => {
+          // 1. Animal Details (No Selector)
+          db.animals.find().$.subscribe(docs => {
             if (isMounted) {
               const raw = docs.map(d => d.toJSON() as Animal);
-              const foundAnimal = raw.find(a => a.id === animalId && !a.is_deleted);
+              const foundAnimal = raw.find(a => a.record_type === 'animals' && a.id === animalId && !a.is_deleted);
               setAnimal(foundAnimal || null);
             }
           }),
 
-          // 2. Husbandry / Daily Logs (Bulletproof Memory Filter)
-          db.daily_records.find({
-            selector: { record_type: 'daily_logs_v2' }
-          }).$.subscribe(docs => {
+          // 2. Husbandry / Daily Logs (No Selector)
+          db.daily_records.find().$.subscribe(docs => {
             if (isMounted) {
               const raw = docs.map(d => d.toJSON() as LogEntry);
-              // Filter by animal ID and ensure it's not deleted
-              const animalLogs = raw.filter(l => l.animal_id === animalId && !l.is_deleted);
-              // Sort by date descending
+              console.log(`🕵️ [Profile Logs] Total daily_records: ${raw.length}`);
+              
+              const animalLogs = raw.filter(l => 
+                l.record_type === 'daily_logs_v2' && 
+                l.animal_id === animalId && 
+                !l.is_deleted
+              );
+              
+              console.log(`🕵️ [Profile Logs] Matched to this animal: ${animalLogs.length}`);
+              
               setDailyLogs(animalLogs.sort((a, b) => new Date(b.log_date || 0).getTime() - new Date(a.log_date || 0).getTime()));
             }
           }),
 
-          // 3. Medical Logs
-          db.clinical_records.find({
-            selector: { record_type: 'medical_logs' }
-          }).$.subscribe(docs => {
+          // 3. Medical Logs (No Selector)
+          db.clinical_records.find().$.subscribe(docs => {
             if (isMounted) {
               const raw = docs.map(d => d.toJSON() as ClinicalNote);
-              const animalMedLogs = raw.filter(m => m.animal_id === animalId && !m.is_deleted);
+              const animalMedLogs = raw.filter(m => m.record_type === 'medical_logs' && m.animal_id === animalId && !m.is_deleted);
               setMedicalLogs(animalMedLogs.sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime()));
             }
           }),
 
-          // 4. Tasks
-          db.tasks.find({
-            selector: { record_type: 'tasks' }
-          }).$.subscribe(docs => {
+          // 4. Tasks (No Selector)
+          db.tasks.find().$.subscribe(docs => {
             if (isMounted) {
               const raw = docs.map(d => d.toJSON() as Task);
-              const animalTasks = raw.filter(t => t.animal_id === animalId && !t.is_deleted);
+              const animalTasks = raw.filter(t => t.record_type === 'tasks' && t.animal_id === animalId && !t.is_deleted);
               setTasks(animalTasks.sort((a, b) => new Date(a.due_date || 0).getTime() - new Date(b.due_date || 0).getTime()));
             }
           })

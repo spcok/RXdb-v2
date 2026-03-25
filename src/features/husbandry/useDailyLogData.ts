@@ -10,22 +10,29 @@ export const useDailyLogData = (viewDate: string, activeCategory: string) => {
 
   useEffect(() => {
     let isMounted = true;
-    let sub: { unsubscribe: () => void } | null = null;
+    let sub: any;
 
     const loadLogs = async () => {
       try {
         const db = coreDB || await bootCoreDatabase();
         if (!isMounted) return;
 
-        sub = db.daily_records.find({
-          selector: { 
-            log_date: { $eq: viewDate },
-            is_deleted: { $eq: false },
-            record_type: { $eq: 'daily_logs_v2' }
-          }
-        }).$.subscribe(docs => {
+        // 🚨 NUCLEAR OPTION: No selectors at all. Fetch everything and filter in memory.
+        sub = db.daily_records.find().$.subscribe(docs => {
           if (isMounted) {
-            setAllLogs(docs.map(d => d.toJSON() as LogEntry));
+            const rawData = docs.map(d => d.toJSON() as LogEntry);
+            
+            console.log(`🕵️ [Daily Logs] Total records in local bucket: ${rawData.length}`);
+
+            const filtered = rawData.filter(log => 
+              log.record_type === 'daily_logs_v2' && 
+              log.log_date === viewDate && 
+              !log.is_deleted
+            );
+            
+            console.log(`🕵️ [Daily Logs] Records matching today (${viewDate}): ${filtered.length}`);
+
+            setAllLogs(filtered);
             setIsLogsLoading(false);
           }
         });
