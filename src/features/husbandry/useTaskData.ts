@@ -21,25 +21,29 @@ export const useTaskData = () => {
         const db = coreDB || await bootCoreDatabase();
         if (!isMounted) return;
 
-        const tasksSub = db.tasks.find({
-          selector: { is_deleted: { $eq: false } },
-          sort: [{ due_date: 'asc' }]
-        }).$.subscribe(docs => {
-          if (isMounted) {
-            setTasks(docs.map(d => d.toJSON() as Task));
-          }
-        });
+        subs = [
+          db.tasks.find({
+            selector: { is_deleted: { $eq: false } }
+          }).$.subscribe(docs => {
+            if (isMounted) {
+              const rawData = docs.map(d => d.toJSON() as Task);
+              // Sort in memory by date
+              const sortedData = rawData.sort((a, b) => 
+                new Date(a.due_date || 0).getTime() - new Date(b.due_date || 0).getTime()
+              );
+              setTasks(sortedData);
+            }
+          }),
 
-        const animalsSub = db.animals.find({
-          selector: { is_deleted: { $eq: false } }
-        }).$.subscribe(docs => {
-          if (isMounted) {
-            setAnimals(docs.map(d => d.toJSON() as Animal));
-            setIsLoading(false);
-          }
-        });
-
-        subs = [tasksSub, animalsSub];
+          db.animals.find({
+            selector: { is_deleted: { $eq: false } }
+          }).$.subscribe(docs => {
+            if (isMounted) {
+              setAnimals(docs.map(d => d.toJSON() as Animal));
+              setIsLoading(false);
+            }
+          })
+        ];
       } catch (err) {
         console.error('Failed to load task data:', err);
         if (isMounted) setIsLoading(false);
@@ -56,7 +60,6 @@ export const useTaskData = () => {
 
   const [filter, setFilter] = useState<'assigned' | 'pending' | 'completed'>('pending');
   const [searchTerm, setSearchTerm] = useState('');
-
   const currentUser = mockUsers[0];
 
   const filteredTasks = useMemo(() => {
@@ -68,13 +71,9 @@ export const useTaskData = () => {
       if (searchTerm) {
         const searchLower = searchTerm.toLowerCase();
         const animalName = animals.find(a => a.id === task.animal_id)?.name.toLowerCase() || '';
-        const userName = mockUsers.find(u => u.id === task.assigned_to)?.name.toLowerCase() || '';
-        
         return (
           task.title.toLowerCase().includes(searchLower) ||
-          (task.type && task.type.toLowerCase().includes(searchLower)) ||
-          animalName.includes(searchLower) ||
-          userName.includes(searchLower)
+          animalName.includes(searchLower)
         );
       }
       return true;
@@ -83,63 +82,26 @@ export const useTaskData = () => {
 
   const addTask = async (newTask: Omit<Task, 'id'>) => {
     const db = coreDB || await bootCoreDatabase();
-    const taskWithId = { 
-      ...newTask, 
-      id: crypto.randomUUID(),
-      updated_at: new Date().toISOString(),
-      is_deleted: false
-    } as Task;
+    const taskWithId = { ...newTask, id: crypto.randomUUID(), updated_at: new Date().toISOString(), is_deleted: false } as Task;
     await db.tasks.upsert(taskWithId);
   };
 
   const updateTask = async (id: string, updates: Partial<Task>) => {
     const db = coreDB || await bootCoreDatabase();
     const taskDoc = await db.tasks.findOne(id).exec();
-    if (taskDoc) {
-      const task = taskDoc.toJSON();
-      await db.tasks.upsert({ 
-        ...task, 
-        ...updates,
-        updated_at: new Date().toISOString()
-      });
-    }
+    if (taskDoc) await db.tasks.upsert({ ...taskDoc.toJSON(), ...updates, updated_at: new Date().toISOString() });
   };
 
   const deleteTask = async (id: string) => {
     const db = coreDB || await bootCoreDatabase();
     const taskDoc = await db.tasks.findOne(id).exec();
-    if (taskDoc) {
-      const task = taskDoc.toJSON();
-      await db.tasks.upsert({ 
-        ...task, 
-        is_deleted: true,
-        updated_at: new Date().toISOString()
-      });
-    }
+    if (taskDoc) await db.tasks.upsert({ ...taskDoc.toJSON(), is_deleted: true, updated_at: new Date().toISOString() });
   };
 
   const toggleTaskCompletion = async (task: Task) => {
     const db = coreDB || await bootCoreDatabase();
-    await db.tasks.upsert({ 
-      ...task, 
-      completed: !task.completed,
-      updated_at: new Date().toISOString()
-    });
+    await db.tasks.upsert({ ...task, completed: !task.completed, updated_at: new Date().toISOString() });
   };
 
-  return {
-    tasks: filteredTasks,
-    animals,
-    users: mockUsers,
-    isLoading,
-    filter,
-    setFilter,
-    searchTerm,
-    setSearchTerm,
-    addTask,
-    updateTask,
-    deleteTask,
-    toggleTaskCompletion,
-    currentUser
-  };
+  return { tasks: filteredTasks, animals, users: mockUsers, isLoading, filter, setFilter, searchTerm, setSearchTerm, addTask, updateTask, deleteTask, toggleTaskCompletion, currentUser };
 };

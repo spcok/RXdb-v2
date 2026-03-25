@@ -9,20 +9,28 @@ export function useAnimalsData() {
 
   useEffect(() => {
     let isMounted = true;
-    let sub: { unsubscribe: () => void } | null = null;
+    let sub: any;
 
     const loadAnimals = async () => {
       try {
         const db = coreDB || await bootCoreDatabase();
         if (!isMounted) return;
 
+        // 🚨 Bulletproof Query: Ask for the record type, handle the booleans in-memory
         sub = db.animals.find({
-          selector: { is_deleted: { $eq: false } },
-          sort: [{ name: 'asc' }]
+          selector: { record_type: 'animals' } 
         }).$.subscribe({
           next: (docs) => {
             if (isMounted) {
-              setAnimals(docs.map(d => d.toJSON() as Animal));
+              const rawData = docs.map(d => d.toJSON() as Animal);
+              
+              // Filter out deleted items safely (handles undefined/null natively)
+              const activeAnimals = rawData.filter(a => !a.is_deleted);
+              
+              // Sort safely
+              const sortedData = activeAnimals.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+              
+              setAnimals(sortedData);
               setIsLoading(false);
             }
           },
@@ -50,9 +58,5 @@ export function useAnimalsData() {
     };
   }, []);
 
-  return {
-    animals,
-    isLoading,
-    error
-  };
+  return { animals, isLoading, error };
 }

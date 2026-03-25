@@ -1,56 +1,79 @@
 import { useState, useEffect } from 'react';
 import { coreDB, bootCoreDatabase } from '../../lib/DatabaseCore';
-import { Animal, LogEntry, Task } from '../../types';
+import { Animal, ClinicalNote, LogEntry, Task } from '../../types';
 
-export function useAnimalProfileData(animalId: string) {
+export function useAnimalProfileData(animalId: string | undefined) {
   const [animal, setAnimal] = useState<Animal | null>(null);
-  const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [dailyLogs, setDailyLogs] = useState<LogEntry[]>([]);
+  const [medicalLogs, setMedicalLogs] = useState<ClinicalNote[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    if (!animalId) {
+      setIsLoading(false);
+      return;
+    }
+
     let isMounted = true;
-    let subs: { unsubscribe: () => void }[] = [];
+    let subs: any[] = [];
 
     const loadData = async () => {
-      if (!animalId) {
-        if (isMounted) setIsLoading(false);
-        return;
-      }
       try {
         const db = coreDB || await bootCoreDatabase();
         if (!isMounted) return;
 
-        const animalSub = db.animals.findOne(animalId).$.subscribe(doc => {
-          if (isMounted) {
-            if (doc) {
-              setAnimal(doc.toJSON() as Animal);
-            } else {
-              setAnimal(null);
+        subs = [
+          // 1. Animal Details
+          db.animals.find({
+            selector: { record_type: 'animals' }
+          }).$.subscribe(docs => {
+            if (isMounted) {
+              const raw = docs.map(d => d.toJSON() as Animal);
+              const foundAnimal = raw.find(a => a.id === animalId && !a.is_deleted);
+              setAnimal(foundAnimal || null);
             }
-            setIsLoading(false);
-          }
-        });
+          }),
 
-        const logsSub = db.daily_records.find({
-          selector: { animal_id: animalId }
-        }).$.subscribe(docs => {
-          if (isMounted) {
-            setLogs(docs.map(d => d.toJSON() as LogEntry));
-          }
-        });
+          // 2. Husbandry / Daily Logs (Bulletproof Memory Filter)
+          db.daily_records.find({
+            selector: { record_type: 'daily_logs_v2' }
+          }).$.subscribe(docs => {
+            if (isMounted) {
+              const raw = docs.map(d => d.toJSON() as LogEntry);
+              // Filter by animal ID and ensure it's not deleted
+              const animalLogs = raw.filter(l => l.animal_id === animalId && !l.is_deleted);
+              // Sort by date descending
+              setDailyLogs(animalLogs.sort((a, b) => new Date(b.log_date || 0).getTime() - new Date(a.log_date || 0).getTime()));
+            }
+          }),
 
-        const tasksSub = db.tasks.find({
-          selector: { animal_id: animalId }
-        }).$.subscribe(docs => {
-          if (isMounted) {
-            setTasks(docs.map(d => d.toJSON() as Task));
-          }
-        });
+          // 3. Medical Logs
+          db.clinical_records.find({
+            selector: { record_type: 'medical_logs' }
+          }).$.subscribe(docs => {
+            if (isMounted) {
+              const raw = docs.map(d => d.toJSON() as ClinicalNote);
+              const animalMedLogs = raw.filter(m => m.animal_id === animalId && !m.is_deleted);
+              setMedicalLogs(animalMedLogs.sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime()));
+            }
+          }),
 
-        subs = [animalSub, logsSub, tasksSub];
+          // 4. Tasks
+          db.tasks.find({
+            selector: { record_type: 'tasks' }
+          }).$.subscribe(docs => {
+            if (isMounted) {
+              const raw = docs.map(d => d.toJSON() as Task);
+              const animalTasks = raw.filter(t => t.animal_id === animalId && !t.is_deleted);
+              setTasks(animalTasks.sort((a, b) => new Date(a.due_date || 0).getTime() - new Date(b.due_date || 0).getTime()));
+            }
+          })
+        ];
+        
+        if (isMounted) setIsLoading(false);
       } catch (err) {
-        console.error('Failed to load animal profile data:', err);
+        console.error("Failed to load animal profile data:", err);
         if (isMounted) setIsLoading(false);
       }
     };
@@ -59,33 +82,9 @@ export function useAnimalProfileData(animalId: string) {
 
     return () => {
       isMounted = false;
-      subs.forEach(sub => sub.unsubscribe());
+      subs.forEach(sub => sub?.unsubscribe?.());
     };
   }, [animalId]);
 
-  const archiveAnimal = async (reason: string, type: NonNullable<Animal['archive_type']>) => {
-    const db = coreDB || await bootCoreDatabase();
-    if (!animal) return;
-    const doc = await db.animals.findOne(animal.id).exec();
-    if (doc) {
-      await doc.patch({
-        record_type: 'archived_animals',
-        archived: true,
-        archive_reason: reason,
-        archive_type: type,
-        archived_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      });
-    }
-  };
-
-  return {
-    animal,
-    logs,
-    tasks,
-    orgProfile: { name: 'Kent Owl Academy', logo_url: '' },
-    allAnimals: [],
-    isLoading,
-    archiveAnimal
-  };
+  return { animal, dailyLogs, medicalLogs, tasks, isLoading };
 }
