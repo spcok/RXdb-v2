@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAuthStore } from '../../store/authStore';
 import { Loader2, ShieldCheck, Mail, Lock, Bird, WifiOff } from 'lucide-react';
 import { motion } from 'motion/react';
+import { bootCoreDatabase } from '../../lib/DatabaseCore';
 
 const LoginScreen: React.FC = () => {
   const { login, initialize } = useAuthStore();
@@ -13,18 +14,67 @@ const LoginScreen: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isConfigured) {
-      setError('Supabase is not configured. Please use Offline Mode or configure environment variables.');
-      return;
-    }
     setIsSubmitting(true);
     setError(null);
 
     try {
-      await login(email, password);
-    } catch (err: unknown) {
-      const error = err as { message?: string };
-      setError(error.message || 'An unexpected error occurred. Please try again later.');
+      if (navigator.onLine) {
+        try {
+          // Tier 1 (Online): Attempt Supabase Login
+          await login(email, password);
+          await bootCoreDatabase(); // Wake engine to rebuild empty cache
+          return; 
+        } catch (onlineError: any) {
+          // SECURITY GUARD: If Supabase rejected the password, STOP immediately.
+          // Do not fall back to offline mode.
+          const errorMsg = onlineError?.message?.toLowerCase() || '';
+          if (errorMsg.includes('credentials') || errorMsg.includes('invalid login') || errorMsg.includes('password')) {
+             throw new Error("Invalid email or password.");
+          }
+          console.warn("Network unreachable. Engaging offline failover...");
+        }
+      }
+
+      // Tier 2 & 3 (Offline Failover): Query the local rulebook
+      const db = await bootCoreDatabase();
+      const users = await db.admin_records.find({
+        selector: { record_type: 'user' }
+      }).exec();
+
+      // Tier 3 (Empty Cache Hard-Stop)
+      if (!users || users.length === 0) {
+        throw new Error("No internet connection and no local profile found. You must connect to Wi-Fi at least once to set up this device for offline use.");
+      }
+
+      // 🚨 Fix: Properly extract the RxDB document data
+      const rawUsers = users.map(u => u.toJSON());
+      const localUser = rawUsers.find(u => u.email === email);
+
+      if (!localUser) {
+         throw new Error("User profile not found on this offline device.");
+      }
+
+      // SECURITY GUARD: Verify the password/PIN offline!
+      // Checking against the 'pin' field stored in admin_records
+      if (localUser.pin !== password && localUser.password !== password) {
+         throw new Error("Invalid email or password.");
+      }
+
+      // Offline Login Success
+      useAuthStore.setState({
+         currentUser: {
+           id: String(localUser.id),
+           email: localUser.email,
+           name: localUser.name || 'Offline User',
+           initials: localUser.initials || 'OU',
+           role: localUser.role || 'GUEST',
+         },
+         session: null, // No active Supabase session
+         isLoading: false
+      });
+
+    } catch (err: any) {
+      setError(err.message || 'An unexpected error occurred. Please try again later.');
     } finally {
       setIsSubmitting(false);
     }
