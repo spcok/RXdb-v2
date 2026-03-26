@@ -1,64 +1,59 @@
 import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
-import { Session } from '@supabase/supabase-js';
-import { User } from '../types';
 import { bootCoreDatabase, startCoreSync } from '../lib/DatabaseCore';
 
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+  initials: string;
+  pin?: string;
+  job_position?: string;
+}
+
 interface AuthState {
-  session: Session | null;
-  currentUser: User | null; 
+  currentUser: User | null;
+  session: any | null;
   isLoading: boolean;
+  error: string | null;
   isUiLocked: boolean;
-  initialized: boolean;
   setUiLocked: (locked: boolean) => void;
   initialize: () => Promise<void>;
-  login: (email: string, password: string) => Promise<void>; 
+  login: (email: string, pin: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
-// 🛡️ Anti-Hang Wrapper: Physically kills stalled promises
-const withTimeout = <T>(promise: Promise<T>, ms: number, errorMessage: string): Promise<T> => {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(errorMessage)), ms);
-    promise.then(
-      (res) => { clearTimeout(timer); resolve(res); },
-      (err) => { clearTimeout(timer); reject(err); }
-    );
-  });
+const withTimeout = <T>(promise: Promise<T>, ms: number, fallbackError: string): Promise<T> => {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error(fallbackError)), ms))
+  ]);
 };
 
 export const useAuthStore = create<AuthState>((set) => ({
-  session: null,
   currentUser: null,
+  session: null,
   isLoading: true,
+  error: null,
   isUiLocked: false,
-  initialized: false,
   setUiLocked: (locked: boolean) => set({ isUiLocked: locked }),
 
   initialize: async () => {
     try {
+      // 🚨 KIOSK SECURITY FIX: Wake up DB, but DO NOT auto-login the user.
+      await bootCoreDatabase().catch(e => console.warn("Background DB boot issue:", e));
+      
       if (navigator.onLine) {
         const { data: { session } } = await withTimeout(
            supabase.auth.getSession(), 
            3000, 
            "Session check timed out"
         );
-        
-        if (session?.user) {
-          // 🚨 CRITICAL FIX: Wake up the sync engine on desktop refresh!
-          startCoreSync().catch(e => console.error("Background sync failed:", e));
-
-          set({
-            session,
-            currentUser: {
-              id: session.user.id,
-              email: session.user.email || '',
-              name: session.user.user_metadata?.name || 'Staff Member',
-              role: session.user.user_metadata?.role || 'GUEST',
-              initials: session.user.user_metadata?.initials || '??'
-            },
-            isLoading: false
-          });
+        if (session) {
+          // Keep the session alive for background syncing, but AuthGuard remains locked
+          set({ session, isLoading: false });
+          startCoreSync().catch(e => console.warn("Background sync issue:", e));
           return;
         }
       }
@@ -69,94 +64,102 @@ export const useAuthStore = create<AuthState>((set) => ({
     }
   },
 
-  login: async (email, password) => {
-    console.log('🔑 [Auth] Attempting Login...');
-    set({ isLoading: true });
-    
+  login: async (email: string, pin: string) => {
+    set({ isLoading: true, error: null });
+
     try {
+      let isOnlineAuthSuccess = false;
+      let activeSession = null;
+
+      // TIER 1: Online Password Verification
       if (navigator.onLine) {
         try {
-          // Tier 1 (Online): Attempt Supabase Login with strict timeout
-          const { error } = await withTimeout(
-            supabase.auth.signInWithPassword({ email, password }),
-            8000,
-            "Supabase login timeout"
+          console.log("📡 [Auth] Attempting Live Supabase Login...");
+          const authResponse = await withTimeout(
+            supabase.auth.signInWithPassword({ email, password: pin }),
+            5000,
+            "Supabase connection timed out."
           );
-          
-          if (error) {
-            const errorMsg = error.message.toLowerCase();
-            if (errorMsg.includes('credentials') || errorMsg.includes('invalid login') || errorMsg.includes('password')) {
-               throw new Error("Invalid email or password.");
+
+          if (authResponse.error) {
+            if (authResponse.error.message.toLowerCase().includes('credentials') || authResponse.error.message.toLowerCase().includes('invalid')) {
+              throw new Error("Invalid email or PIN.");
             }
-            throw error; // Network or other error, fallback to offline
-          }
+            throw new Error("Supabase rejected connection.");
+          } 
           
-          // Wake engine to rebuild empty cache
-          await withTimeout(bootCoreDatabase(), 10000, "Database boot timeout");
-          return; // Success, onAuthStateChange will handle setting the user
-        } catch (onlineError: any) {
-          if (onlineError.message === "Invalid email or password.") {
-            throw onlineError;
-          }
-          console.warn("Network unreachable or timeout. Engaging offline failover...");
+          isOnlineAuthSuccess = true;
+          activeSession = authResponse.data.session;
+          console.log("✅ [Auth] Live Login Successful. Fetching profile...");
+          startCoreSync().catch(e => console.warn(e));
+
+        } catch (tier1Error: any) {
+          if (tier1Error.message === "Invalid email or PIN.") throw tier1Error;
+          console.warn("⚠️ [Auth] Live Login Failed. Falling back to offline cache...", tier1Error.message);
         }
       }
 
-      // Tier 2 & 3 (Offline Failover): Query the local rulebook
-      const db = await withTimeout(bootCoreDatabase(), 10000, "Database boot timeout");
-      const users = await db.admin_records.find({
-        selector: { record_type: 'user' }
-      }).exec();
+      // TIER 2 & PROFILE HYDRATION: Always query RxDB for the REAL user profile
+      const db = await withTimeout(bootCoreDatabase(), 3000, "Local database failed to wake up.");
+      const usersDoc = await withTimeout(
+        db.admin_records.find({ selector: { record_type: 'user' } }).exec(),
+        4000,
+        "Offline database query timed out."
+      );
 
-      // Tier 3 (Empty Cache Hard-Stop)
-      if (!users || users.length === 0) {
-        throw new Error("No internet connection and no local profile found. You must connect to Wi-Fi at least once to set up this device for offline use.");
+      if (!usersDoc || usersDoc.length === 0) {
+        throw new Error("No offline profile found. Connect to Wi-Fi to sync this device.");
       }
 
-      const rawUsers = users.map((u: any) => u.toJSON());
-      const localUser = rawUsers.find((u: any) => u.email === email);
+      const rawUsers = usersDoc.map(u => u.toJSON());
+      const localUser = rawUsers.find(u => u.email?.toLowerCase() === email.toLowerCase() && !u.is_deleted);
 
       if (!localUser) {
-         throw new Error("User profile not found on this offline device.");
+        throw new Error("User profile not found on this device.");
       }
 
-      // SECURITY GUARD: Verify the password/PIN offline
-      const storedPin = String(localUser.pin || '');
-      const storedPass = String(localUser.password || '');
-      
-      if (storedPin !== password && storedPass !== password) {
-         throw new Error("Invalid email or password.");
+      // TIER 3: Offline Password Verification (Only runs if Tier 1 failed/skipped)
+      if (!isOnlineAuthSuccess) {
+        console.log("🔒 [Auth] Engaging Offline Verification...");
+        const storedPin = String(localUser.pin || '');
+        const storedPass = String(localUser.password || '');
+        const inputPin = String(pin);
+        
+        if (storedPin !== inputPin && storedPass !== inputPin) {
+          throw new Error("Invalid email or PIN.");
+        }
+        console.log("✅ [Auth] Offline Login Successful.");
       }
 
-      // Offline Login Success
+      // 🚨 PROFILE HYDRATION FIX: Use the database record, not Supabase metadata
       set({
-         currentUser: {
-           id: String(localUser.id),
-           email: localUser.email,
-           name: localUser.name || 'Offline User',
-           initials: localUser.initials || 'OU',
-           role: localUser.role || 'GUEST',
-         },
-         session: null, 
-         isLoading: false
+        session: activeSession,
+        currentUser: {
+          id: String(localUser.id),
+          email: localUser.email,
+          name: localUser.name || 'Unknown User',
+          role: localUser.role || 'GUEST',
+          initials: localUser.initials || '??',
+          job_position: localUser.job_position || 'Staff',
+        },
+        isLoading: false
       });
 
-    } catch (err: any) {
-      // 🚨 CRITICAL FIX: Ensure UI unlocks if an error is thrown
-      set({ isLoading: false });
-      throw err;
+    } catch (error: any) {
+      console.error("❌ [Auth] Final Rejection:", error.message);
+      set({ error: error.message, isLoading: false });
+      throw error; 
     }
   },
 
   logout: async () => {
-    console.log('🚪 [Auth] Logging out...');
     set({ isLoading: true });
     try {
-      await withTimeout(supabase.auth.signOut(), 5000, "Sign out timeout");
-    } catch (err) {
-      console.warn("Sign out timeout or error, forcing local logout", err);
+      if (navigator.onLine) {
+        await withTimeout(supabase.auth.signOut(), 2000, "Logout timeout").catch(e => console.warn(e));
+      }
     } finally {
-      set({ session: null, currentUser: null, isLoading: false });
+      set({ currentUser: null, session: null, isLoading: false, error: null });
     }
   }
 }));

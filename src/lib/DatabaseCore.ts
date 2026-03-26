@@ -34,13 +34,22 @@ const safetyDrillKeys = ['date', 'title', 'location', 'priority', 'status', 'des
 const listKeys = ['type', 'category', 'value'];
 const taskKeys = ['animal_id', 'title', 'due_date', 'completed', 'assigned_to', 'type', 'notes'];
 
+// 🚨 CRITICAL FIX: Destroy the database cache when the page is hard-refreshed 
+// to prevent Vite from holding onto zombified IndexedDB connections.
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeunload', () => {
+    delete (window as any).__KOA_DB_PROMISE;
+    delete (window as any).__KOA_DB_INSTANCE;
+  });
+}
+
 export const bootCoreDatabase = async (): Promise<RxDatabase> => {
-  if ((window as any).dbInstance) return (window as any).dbInstance;
-  if ((window as any).dbPromise) return (window as any).dbPromise;
+  if ((window as any).__KOA_DB_INSTANCE) return (window as any).__KOA_DB_INSTANCE;
+  if ((window as any).__KOA_DB_PROMISE) return (window as any).__KOA_DB_PROMISE;
 
   console.log("🛡️ [Core DB] Booting Immortal Engine...");
 
-  (window as any).dbPromise = (async () => {
+  (window as any).__KOA_DB_PROMISE = (async () => {
     try {
       const db = await createRxDatabase({
         name: 'koa_manager_core_db_final',
@@ -62,15 +71,15 @@ export const bootCoreDatabase = async (): Promise<RxDatabase> => {
         tasks: { schema: { version: 0, primaryKey: 'id', type: 'object', additionalProperties: false, properties: { ...baseProps, ...makeProps(taskKeys) }, required: ['id', 'record_type'] } }
       });
 
-      (window as any).dbInstance = db;
+      (window as any).__KOA_DB_INSTANCE = db;
       return db;
     } catch (error) {
-      (window as any).dbPromise = null;
+      (window as any).__KOA_DB_PROMISE = null;
       throw error;
     }
   })();
 
-  return (window as any).dbPromise;
+  return (window as any).__KOA_DB_PROMISE;
 };
 
 export const destroyCoreDatabase = async () => {
