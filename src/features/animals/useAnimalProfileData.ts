@@ -11,7 +11,7 @@ export function useAnimalProfileData(animalId: string | undefined) {
 
   useEffect(() => {
     if (!animalId) {
-      setIsLoading(false);
+      setTimeout(() => setIsLoading(false), 0);
       return;
     }
 
@@ -24,7 +24,7 @@ export function useAnimalProfileData(animalId: string | undefined) {
         if (!isMounted) return;
 
         subs = [
-          // 1. Animal Details (No Selector)
+          // 1. Animal Details
           db.animals.find().$.subscribe(docs => {
             if (isMounted) {
               const raw = docs.map(d => d.toJSON() as Animal);
@@ -33,39 +33,49 @@ export function useAnimalProfileData(animalId: string | undefined) {
             }
           }),
 
-          // 2. Husbandry / Daily Logs (No Selector)
+          // 2. Husbandry / Daily Logs
           db.daily_records.find().$.subscribe(docs => {
             if (isMounted) {
               const raw = docs.map(d => d.toJSON() as LogEntry);
-              console.log(`🕵️ [Profile Logs] Total daily_records: ${raw.length}`);
+              const animalLogs = raw.filter(l => l.record_type === 'daily_logs_v2' && l.animal_id === animalId && !l.is_deleted);
               
-              const animalLogs = raw.filter(l => 
-                l.record_type === 'daily_logs_v2' && 
-                l.animal_id === animalId && 
-                !l.is_deleted
-              );
-              
-              console.log(`🕵️ [Profile Logs] Matched to this animal: ${animalLogs.length}`);
-              
-              setDailyLogs(animalLogs.sort((a, b) => new Date(b.log_date || 0).getTime() - new Date(a.log_date || 0).getTime()));
+              // 🚨 CRITICAL FIX: Robust Date Fallback Sort (Newest First)
+              const sortedLogs = animalLogs.sort((a, b) => {
+                const timeA = new Date(a.log_date || a.created_at || 0).getTime();
+                const timeB = new Date(b.log_date || b.created_at || 0).getTime();
+                return timeB - timeA; 
+              });
+              setDailyLogs(sortedLogs);
             }
           }),
 
-          // 3. Medical Logs (No Selector)
+          // 3. Medical Logs
           db.clinical_records.find().$.subscribe(docs => {
             if (isMounted) {
               const raw = docs.map(d => d.toJSON() as ClinicalNote);
               const animalMedLogs = raw.filter(m => m.record_type === 'medical_logs' && m.animal_id === animalId && !m.is_deleted);
-              setMedicalLogs(animalMedLogs.sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime()));
+              
+              const sortedMed = animalMedLogs.sort((a, b) => {
+                const timeA = new Date(a.date || a.updated_at || 0).getTime();
+                const timeB = new Date(b.date || b.updated_at || 0).getTime();
+                return timeB - timeA;
+              });
+              setMedicalLogs(sortedMed);
             }
           }),
 
-          // 4. Tasks (No Selector)
+          // 4. Tasks
           db.tasks.find().$.subscribe(docs => {
             if (isMounted) {
               const raw = docs.map(d => d.toJSON() as Task);
               const animalTasks = raw.filter(t => t.record_type === 'tasks' && t.animal_id === animalId && !t.is_deleted);
-              setTasks(animalTasks.sort((a, b) => new Date(a.due_date || 0).getTime() - new Date(b.due_date || 0).getTime()));
+              
+              const sortedTasks = animalTasks.sort((a, b) => {
+                const timeA = new Date(a.due_date || a.updated_at || 0).getTime();
+                const timeB = new Date(b.due_date || b.updated_at || 0).getTime();
+                return timeB - timeA;
+              });
+              setTasks(sortedTasks);
             }
           })
         ];

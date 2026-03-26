@@ -30,9 +30,16 @@ export const useDailyLogData = (viewDate: string, activeCategory: string) => {
               !log.is_deleted
             );
             
-            console.log(`🕵️ [Daily Logs] Records matching today (${viewDate}): ${filtered.length}`);
+            // 🚨 CRITICAL FIX: Robust Date Fallback Sort (Newest First)
+            const sorted = filtered.sort((a, b) => {
+              const timeA = new Date(a.log_date || a.created_at || 0).getTime();
+              const timeB = new Date(b.log_date || b.created_at || 0).getTime();
+              return timeB - timeA;
+            });
 
-            setAllLogs(filtered);
+            console.log(`🕵️ [Daily Logs] Records matching today (${viewDate}): ${sorted.length}`);
+
+            setAllLogs(sorted);
             setIsLogsLoading(false);
           }
         });

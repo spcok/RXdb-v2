@@ -118,13 +118,25 @@ export const startCoreSync = async () => {
             modifier: (doc: any) => {
               const cleanDoc = { ...doc };
               if (!cleanDoc.id) cleanDoc.id = crypto.randomUUID(); 
-              return { ...cleanDoc, id: String(cleanDoc.id), record_type: config.type, is_deleted: !!cleanDoc.is_deleted };
+              // 🚨 CRITICAL FIX: Tell RxDB if the pulled document is deleted
+              return { 
+                ...cleanDoc, 
+                id: String(cleanDoc.id), 
+                record_type: config.type, 
+                _deleted: !!cleanDoc.is_deleted 
+              };
             } 
           },
           push: { 
             modifier: (doc: any) => {
               if (doc.record_type !== config.type) return null;
               const cleanDoc = { ...doc };
+              
+              // 🚨 CRITICAL FIX: Translate RxDB deletion back to Supabase schema
+              cleanDoc.is_deleted = !!cleanDoc._deleted;
+              
+              // 🚨 NOTE: Add any further legacy data mapping here if needed.
+              
               delete cleanDoc._deleted;
               delete cleanDoc._attachments;
               delete cleanDoc._rev;

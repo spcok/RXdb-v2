@@ -1,16 +1,7 @@
 import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
 import { bootCoreDatabase, startCoreSync } from '../lib/DatabaseCore';
-
-export interface User {
-  id: string;
-  email: string;
-  name: string;
-  role: string;
-  initials: string;
-  pin?: string;
-  job_position?: string;
-}
+import { User } from '../types';
 
 interface AuthState {
   currentUser: User | null;
@@ -20,7 +11,8 @@ interface AuthState {
   isUiLocked: boolean;
   setUiLocked: (locked: boolean) => void;
   initialize: () => Promise<void>;
-  login: (email: string, pin: string) => Promise<void>;
+  // 🚨 CRITICAL FIX: Explicitly require password, not PIN, for primary login
+  login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -37,11 +29,10 @@ export const useAuthStore = create<AuthState>((set) => ({
   isLoading: true,
   error: null,
   isUiLocked: false,
-  setUiLocked: (locked: boolean) => set({ isUiLocked: locked }),
+  setUiLocked: (locked) => set({ isUiLocked: locked }),
 
   initialize: async () => {
     try {
-      // 🚨 KIOSK SECURITY FIX: Wake up DB, but DO NOT auto-login the user.
       await bootCoreDatabase().catch(e => console.warn("Background DB boot issue:", e));
       
       if (navigator.onLine) {
@@ -51,7 +42,6 @@ export const useAuthStore = create<AuthState>((set) => ({
            "Session check timed out"
         );
         if (session) {
-          // Keep the session alive for background syncing, but AuthGuard remains locked
           set({ session, isLoading: false });
           startCoreSync().catch(e => console.warn("Background sync issue:", e));
           return;
@@ -64,26 +54,27 @@ export const useAuthStore = create<AuthState>((set) => ({
     }
   },
 
-  login: async (email: string, pin: string) => {
+  login: async (email: string, password: string) => {
     set({ isLoading: true, error: null });
 
     try {
       let isOnlineAuthSuccess = false;
       let activeSession = null;
 
-      // TIER 1: Online Password Verification
+      // TIER 1: Strict Online Password Verification
       if (navigator.onLine) {
         try {
           console.log("📡 [Auth] Attempting Live Supabase Login...");
           const authResponse = await withTimeout(
-            supabase.auth.signInWithPassword({ email, password: pin }),
+            supabase.auth.signInWithPassword({ email, password }),
             5000,
             "Supabase connection timed out."
           );
 
           if (authResponse.error) {
             if (authResponse.error.message.toLowerCase().includes('credentials') || authResponse.error.message.toLowerCase().includes('invalid')) {
-              throw new Error("Invalid email or PIN.");
+              // 🚨 CRITICAL FIX: Explicitly flag this as a hard credential failure
+              throw new Error("Invalid email or password.");
             }
             throw new Error("Supabase rejected connection.");
           } 
@@ -94,8 +85,12 @@ export const useAuthStore = create<AuthState>((set) => ({
           startCoreSync().catch(e => console.warn(e));
 
         } catch (tier1Error: any) {
-          if (tier1Error.message === "Invalid email or PIN.") throw tier1Error;
-          console.warn("⚠️ [Auth] Live Login Failed. Falling back to offline cache...", tier1Error.message);
+          // 🚨 CRITICAL FIX: The Online-First Gatekeeper
+          // If Supabase verified the connection but rejected the password, ABORT completely.
+          if (tier1Error.message === "Invalid email or password.") {
+            throw tier1Error; 
+          }
+          console.warn("⚠️ [Auth] Live Login Network Failure. Falling back to offline cache...", tier1Error.message);
         }
       }
 
@@ -104,7 +99,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       const usersDoc = await withTimeout(
         db.admin_records.find({ selector: { record_type: 'user' } }).exec(),
         4000,
-        "Offline database query timed out."
+        "Offline database query timed out. IndexedDB connection may be corrupted."
       );
 
       if (!usersDoc || usersDoc.length === 0) {
@@ -118,20 +113,20 @@ export const useAuthStore = create<AuthState>((set) => ({
         throw new Error("User profile not found on this device.");
       }
 
-      // TIER 3: Offline Password Verification (Only runs if Tier 1 failed/skipped)
+      // TIER 3: Offline Verification (Strictly reserved for network failures)
       if (!isOnlineAuthSuccess) {
         console.log("🔒 [Auth] Engaging Offline Verification...");
         const storedPin = String(localUser.pin || '');
         const storedPass = String(localUser.password || '');
-        const inputPin = String(pin);
+        const inputCredentials = String(password);
         
-        if (storedPin !== inputPin && storedPass !== inputPin) {
-          throw new Error("Invalid email or PIN.");
+        // Accept either their full password or their PIN when forced offline
+        if (storedPin !== inputCredentials && storedPass !== inputCredentials) {
+          throw new Error("Invalid offline email or PIN/Password.");
         }
         console.log("✅ [Auth] Offline Login Successful.");
       }
 
-      // 🚨 PROFILE HYDRATION FIX: Use the database record, not Supabase metadata
       set({
         session: activeSession,
         currentUser: {
@@ -140,7 +135,6 @@ export const useAuthStore = create<AuthState>((set) => ({
           name: localUser.name || 'Unknown User',
           role: localUser.role || 'GUEST',
           initials: localUser.initials || '??',
-          job_position: localUser.job_position || 'Staff',
         },
         isLoading: false
       });
