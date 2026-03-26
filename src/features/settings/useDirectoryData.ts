@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { coreDB, bootCoreDatabase } from '../../lib/DatabaseCore';
+import { bootCoreDatabase } from '../../lib/DatabaseCore';
 import { Contact } from '../../types';
 
 export function useDirectoryData() {
@@ -13,7 +13,7 @@ export function useDirectoryData() {
 
     const loadContacts = async () => {
       try {
-        const db = coreDB || await bootCoreDatabase();
+        const db = await bootCoreDatabase();
         if (!isMounted) return;
 
         sub = db.admin_records.find({
@@ -42,7 +42,7 @@ export function useDirectoryData() {
   }, []);
 
   const addContact = async (contact: Omit<Contact, 'id'>) => {
-    const db = coreDB || await bootCoreDatabase();
+    const db = await bootCoreDatabase();
     const id = uuidv4();
     const newContact = {
       ...contact,
@@ -59,7 +59,7 @@ export function useDirectoryData() {
   };
 
   const updateContact = async (contact: Contact) => {
-    const db = coreDB || await bootCoreDatabase();
+    const db = await bootCoreDatabase();
     try {
       await db.admin_records.upsert({
         ...contact,
@@ -72,7 +72,7 @@ export function useDirectoryData() {
   };
 
   const deleteContact = async (id: string) => {
-    const db = coreDB || await bootCoreDatabase();
+    const db = await bootCoreDatabase();
     try {
       const doc = await db.admin_records.findOne(id).exec();
       if (doc) {

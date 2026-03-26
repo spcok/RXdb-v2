@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { coreDB, bootCoreDatabase } from '../lib/DatabaseCore';
+import { bootCoreDatabase } from '../lib/DatabaseCore';
 import { AnimalCategory, OperationalList } from '../types';
 
 export function useOperationalLists(category: AnimalCategory = AnimalCategory.ALL) {
@@ -13,7 +13,7 @@ export function useOperationalLists(category: AnimalCategory = AnimalCategory.AL
 
     const loadData = async () => {
       try {
-        const db = coreDB || await bootCoreDatabase();
+        const db = await bootCoreDatabase();
         if (!isMounted) return;
 
         sub = db.operational_lists.find().$.subscribe(docs => {
@@ -52,7 +52,7 @@ export function useOperationalLists(category: AnimalCategory = AnimalCategory.AL
   const addListItem = async (type: 'food' | 'method' | 'location' | 'event', value: string, itemCategory: AnimalCategory = category) => {
     if (!value.trim()) return;
     
-    const db = coreDB || await bootCoreDatabase();
+    const db = await bootCoreDatabase();
     const val = value.trim();
     
     const exists = lists.find(l => 
@@ -78,7 +78,7 @@ export function useOperationalLists(category: AnimalCategory = AnimalCategory.AL
   const updateListItem = async (id: string, value: string) => {
     if (!value.trim()) return;
     
-    const db = coreDB || await bootCoreDatabase();
+    const db = await bootCoreDatabase();
     const itemDoc = await db.operational_lists.findOne(id).exec();
     if (itemDoc) {
       const item = itemDoc.toJSON();
@@ -91,7 +91,7 @@ export function useOperationalLists(category: AnimalCategory = AnimalCategory.AL
   };
 
   const removeListItem = async (id: string) => {
-    const db = coreDB || await bootCoreDatabase();
+    const db = await bootCoreDatabase();
     const itemDoc = await db.operational_lists.findOne(id).exec();
     if (itemDoc) {
       const item = itemDoc.toJSON();

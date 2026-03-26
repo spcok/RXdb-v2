@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { coreDB, bootCoreDatabase } from '../../lib/DatabaseCore';
+import { bootCoreDatabase } from '../../lib/DatabaseCore';
 import { MaintenanceLog } from '../../types';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -13,7 +13,7 @@ export function useMaintenanceData() {
 
     const loadData = async () => {
       try {
-        const db = coreDB || await bootCoreDatabase();
+        const db = await bootCoreDatabase();
         if (!isMounted) return;
 
         sub = db.maintenance_logs.find().$.subscribe(docs => {
@@ -39,7 +39,7 @@ export function useMaintenanceData() {
   }, []);
 
   const addLog = async (log: Omit<MaintenanceLog, 'id'>) => {
-    const db = coreDB || await bootCoreDatabase();
+    const db = await bootCoreDatabase();
     const newLog: MaintenanceLog = {
       ...log,
       id: uuidv4(),
@@ -50,7 +50,7 @@ export function useMaintenanceData() {
   };
 
   const updateLog = async (log: MaintenanceLog) => {
-    const db = coreDB || await bootCoreDatabase();
+    const db = await bootCoreDatabase();
     await db.maintenance_logs.upsert({
       ...log,
       updated_at: new Date().toISOString()
@@ -58,7 +58,7 @@ export function useMaintenanceData() {
   };
 
   const deleteLog = async (id: string) => {
-    const db = coreDB || await bootCoreDatabase();
+    const db = await bootCoreDatabase();
     const logDoc = await db.maintenance_logs.findOne(id).exec();
     if (logDoc) {
       const log = logDoc.toJSON();

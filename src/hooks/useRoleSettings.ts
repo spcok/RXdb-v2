@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { coreDB, bootCoreDatabase } from '../lib/DatabaseCore';
+import { bootCoreDatabase } from '../lib/DatabaseCore';
 import { UserRole, RolePermissionConfig } from '../types';
 
 const defaultPermissions: Omit<RolePermissionConfig, 'role'> = {
@@ -52,7 +52,7 @@ export const useRoleSettings = () => {
 
     const loadData = async () => {
       try {
-        const db = coreDB || await bootCoreDatabase();
+        const db = await bootCoreDatabase();
         if (!isMounted) return;
 
         sub = db.admin_records.find({
@@ -79,7 +79,7 @@ export const useRoleSettings = () => {
   useEffect(() => {
     let isMounted = true;
     const ensureRoles = async () => {
-      const db = coreDB || await bootCoreDatabase();
+      const db = await bootCoreDatabase();
       if (!isMounted) return;
 
       if (roles.length > 0) {
@@ -110,7 +110,7 @@ export const useRoleSettings = () => {
   }, [roles]);
 
   const handlePermissionChange = async (role: UserRole, permissionKey: keyof RolePermissionConfig, newValue: boolean) => {
-    const db = coreDB || await bootCoreDatabase();
+    const db = await bootCoreDatabase();
     const roleConfig = roles?.find(r => r.role === role);
     if (!roleConfig) return;
 

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { coreDB, bootCoreDatabase } from '../../lib/DatabaseCore';
+import { bootCoreDatabase } from '../../lib/DatabaseCore';
 import { User, RolePermissionConfig } from '../../types';
 import { supabase } from '../../lib/supabase';
 
@@ -18,7 +18,7 @@ export function useUsersData() {
 
     const loadData = async () => {
       try {
-        const db = coreDB || await bootCoreDatabase();
+        const db = await bootCoreDatabase();
         if (!isMounted) return;
 
         const usersSub = db.admin_records.find({
@@ -75,7 +75,7 @@ export function useUsersData() {
     if (data?.error) throw new Error(`Deletion Failed: ${data.error}`);
     
     // Also delete locally
-    const db = coreDB || await bootCoreDatabase();
+    const db = await bootCoreDatabase();
     const doc = await db.admin_records.findOne(id).exec();
     if (doc) {
       await doc.patch({ is_deleted: true, updated_at: new Date().toISOString() });
@@ -83,7 +83,7 @@ export function useUsersData() {
   };
 
   const updateUser = async (id: string, updates: Partial<User>) => {
-    const db = coreDB || await bootCoreDatabase();
+    const db = await bootCoreDatabase();
     const doc = await db.admin_records.findOne(id).exec();
     if (doc) {
       await doc.patch({
@@ -94,7 +94,7 @@ export function useUsersData() {
   };
 
   const updateRolePermissions = async (role: string, updates: Partial<RolePermissionConfig>) => {
-    const db = coreDB || await bootCoreDatabase();
+    const db = await bootCoreDatabase();
     const docs = await db.admin_records.find({
       selector: {
         record_type: 'role_permission',

@@ -14,7 +14,7 @@ import {
   Wrench
 } from 'lucide-react';
 import { renderAsync } from 'docx-preview';
-import { coreDB, bootCoreDatabase } from '../../lib/DatabaseCore';
+import { bootCoreDatabase } from '../../lib/DatabaseCore';
 import { Animal, UserRole, Shift, ClinicalNote, MARChart, InternalMovement, ExternalTransfer, MaintenanceLog } from '../../types';
 import { generateDailyLogDocx, generateInternalMovementsDocx, generateExternalTransfersDocx, generateSiteMaintenanceDocx, generateAnimalCensusDocx, generateSection9Docx, generateDeathCertificateDocx, generateStaffRotaDocx, generateInspectionPackage } from './utils/docxExportService';
 import { useAuthStore } from '../../store/authStore';
@@ -150,7 +150,7 @@ export default function ReportsDashboard() {
 
     const loadData = async () => {
       try {
-        const db = coreDB || await bootCoreDatabase();
+        const db = await bootCoreDatabase();
         if (!isMounted) return;
 
         animalsSub = db.animals.find({
@@ -231,7 +231,7 @@ export default function ReportsDashboard() {
     setError(null);
 
     try {
-      const db = coreDB || await bootCoreDatabase();
+      const db = await bootCoreDatabase();
       const animalSectionMap = new Map(
         (animals || []).map(a => [a.id, (a as unknown as Record<string, string>).section || a.category])
       );

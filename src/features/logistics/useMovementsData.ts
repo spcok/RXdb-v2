@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { coreDB, bootCoreDatabase } from '../../lib/DatabaseCore';
+import { bootCoreDatabase } from '../../lib/DatabaseCore';
 import { InternalMovement } from '../../types';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -13,7 +13,7 @@ export function useMovementsData() {
 
     const loadData = async () => {
       try {
-        const db = coreDB || await bootCoreDatabase();
+        const db = await bootCoreDatabase();
         if (!isMounted) return;
 
         sub = db.logistics_records.find({
@@ -44,7 +44,7 @@ export function useMovementsData() {
   }, []);
 
   const addMovement = async (movement: Omit<InternalMovement, 'id' | 'created_by'>) => {
-    const db = coreDB || await bootCoreDatabase();
+    const db = await bootCoreDatabase();
     const newMovement: InternalMovement = {
       ...movement,
       id: uuidv4(),

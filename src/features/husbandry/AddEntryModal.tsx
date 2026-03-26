@@ -4,7 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { X, Save, Loader2, Plus, Trash2 } from 'lucide-react';
 import { Animal, LogType, LogEntry, AnimalCategory } from '../../types';
 import { getMaidstoneDailyWeather } from '../../services/weatherService';
-import { coreDB, bootCoreDatabase } from '../../lib/DatabaseCore';
+import { bootCoreDatabase } from '../../lib/DatabaseCore';
 import { useOperationalLists } from '../../hooks/useOperationalLists';
 import { convertToGrams, convertFromGrams } from '../../services/weightUtils';
 
@@ -209,7 +209,7 @@ const AddEntryModal: React.FC<AddEntryModalProps> = ({
       if (logType === LogType.BIRTH) {
         entry.value = `Litter Size: ${litterSize} (${litterHealth})`;
         if (!existingLog && typeof litterSize === 'number' && litterSize > 0) {
-          const db = coreDB || await bootCoreDatabase();
+          const db = await bootCoreDatabase();
           const pups = Array.from({ length: litterSize }).map((_, i) => ({
             id: uuidv4(),
             name: `Pup ${i + 1} (${animal.name})`,

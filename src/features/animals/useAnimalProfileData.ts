@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { coreDB, bootCoreDatabase } from '../../lib/DatabaseCore';
+import { bootCoreDatabase } from '../../lib/DatabaseCore';
 import { Animal, ClinicalNote, LogEntry, Task } from '../../types';
 
 export function useAnimalProfileData(animalId: string | undefined) {
@@ -20,7 +20,7 @@ export function useAnimalProfileData(animalId: string | undefined) {
 
     const loadData = async () => {
       try {
-        const db = coreDB || await bootCoreDatabase();
+        const db = await bootCoreDatabase();
         if (!isMounted) return;
 
         subs = [

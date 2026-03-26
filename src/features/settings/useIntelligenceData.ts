@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { coreDB, bootCoreDatabase } from '../../lib/DatabaseCore';
+import { bootCoreDatabase } from '../../lib/DatabaseCore';
 import { Animal, ConservationStatus } from '../../types';
 import { batchGetSpeciesData } from '../../services/geminiService';
 
@@ -13,7 +13,7 @@ export function useIntelligenceData() {
 
     const loadAnimals = async () => {
       try {
-        const db = coreDB || await bootCoreDatabase();
+        const db = await bootCoreDatabase();
         if (!isMounted) return;
 
         sub = db.animals.find().$.subscribe(docs => {
@@ -38,7 +38,7 @@ export function useIntelligenceData() {
 
   const updateAnimal = async (animal: Animal) => {
     try {
-      const db = coreDB || await bootCoreDatabase();
+      const db = await bootCoreDatabase();
       await db.animals.upsert({
         ...animal,
         updated_at: new Date().toISOString()

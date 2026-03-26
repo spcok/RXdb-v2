@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { coreDB, bootCoreDatabase } from '../../lib/DatabaseCore';
+import { bootCoreDatabase } from '../../lib/DatabaseCore';
 import { ZLADocument } from '../../types';
 
 export function useZLADocsData() {
@@ -13,7 +13,7 @@ export function useZLADocsData() {
 
     const loadDocs = async () => {
       try {
-        const db = coreDB || await bootCoreDatabase();
+        const db = await bootCoreDatabase();
         if (!isMounted) return;
 
         sub = db.admin_records.find({
@@ -42,7 +42,7 @@ export function useZLADocsData() {
   }, []);
 
   const addDocument = async (doc: Omit<ZLADocument, 'id'>) => {
-    const db = coreDB || await bootCoreDatabase();
+    const db = await bootCoreDatabase();
     const id = uuidv4();
     const newDoc = {
       ...doc,
@@ -59,7 +59,7 @@ export function useZLADocsData() {
   };
 
   const deleteDocument = async (id: string) => {
-    const db = coreDB || await bootCoreDatabase();
+    const db = await bootCoreDatabase();
     try {
       const doc = await db.admin_records.findOne(id).exec();
       if (doc) {

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { coreDB, bootCoreDatabase } from '../../lib/DatabaseCore';
+import { bootCoreDatabase } from '../../lib/DatabaseCore';
 import { Animal, Task } from '../../types';
 
 export function useFeedingScheduleData() {
@@ -13,7 +13,7 @@ export function useFeedingScheduleData() {
 
     const loadData = async () => {
       try {
-        const db = coreDB || await bootCoreDatabase();
+        const db = await bootCoreDatabase();
         if (!isMounted) return;
 
         const animalsSub = db.animals.find().$.subscribe(docs => {
@@ -45,7 +45,7 @@ export function useFeedingScheduleData() {
   }, []);
 
   const addTasks = async (newTasks: Task[]) => {
-    const db = coreDB || await bootCoreDatabase();
+    const db = await bootCoreDatabase();
     for (const task of newTasks) {
       await db.tasks.upsert({
         ...task,
@@ -56,7 +56,7 @@ export function useFeedingScheduleData() {
   };
 
   const deleteTask = async (id: string) => {
-    const db = coreDB || await bootCoreDatabase();
+    const db = await bootCoreDatabase();
     const taskDoc = await db.tasks.findOne(id).exec();
     if (taskDoc) {
       const task = taskDoc.toJSON();

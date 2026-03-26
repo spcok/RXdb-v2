@@ -6,7 +6,7 @@ import { useAnimalForm } from './useAnimalForm';
 import { getAnimalIntelligence } from '../../services/geminiService';
 import { convertToGrams, convertFromGrams } from '../../services/weightUtils';
 import { Subscription } from 'rxjs';
-import { coreDB, bootCoreDatabase } from '../../lib/DatabaseCore';
+import { bootCoreDatabase } from '../../lib/DatabaseCore';
 import { useOperationalLists } from '../../hooks/useOperationalLists';
 import Cropper from 'react-easy-crop';
 import { getCroppedImg } from '../../utils/cropImage';
@@ -49,7 +49,7 @@ const AnimalFormModal: React.FC<AnimalFormModalProps> = ({ isOpen, onClose, init
 
     const loadData = async () => {
       try {
-        const db = coreDB || await bootCoreDatabase();
+        const db = await bootCoreDatabase();
         if (!isMounted) return;
 
         parentMobsSub = db.animals.find({
@@ -183,7 +183,7 @@ const AnimalFormModal: React.FC<AnimalFormModalProps> = ({ isOpen, onClose, init
       weight_unit: weightUnit === 'lb' ? 'lbs_oz' : weightUnit
     };
     try {
-      const db = coreDB || await bootCoreDatabase();
+      const db = await bootCoreDatabase();
       if (initialData) {
         if (initialData.location !== payload.location && initialData.location !== 'Main Aviary') {
           const internalMovement: InternalMovement = {
@@ -229,7 +229,7 @@ const AnimalFormModal: React.FC<AnimalFormModalProps> = ({ isOpen, onClose, init
     }
     
     try {
-      const db = coreDB || await bootCoreDatabase();
+      const db = await bootCoreDatabase();
       const animalData: Animal = {
         ...initialData,
         ...payload,

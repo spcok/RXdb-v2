@@ -3,9 +3,6 @@ import { getRxStorageDexie } from 'rxdb/plugins/storage-dexie';
 import { replicateSupabase, RxSupabaseReplicationState } from 'rxdb/plugins/replication-supabase';
 import { supabase } from './supabase';
 
-let dbInstance: any = null;
-export let coreDB: RxDatabase | null = null;
-
 const SYNC_MAP: Record<string, { table: string, type: string }[]> = {
   animals: [{ table: 'animals', type: 'animals' }, { table: 'archived_animals', type: 'archived_animals' }],
   daily_records: [{ table: 'daily_logs', type: 'daily_logs_v2' }, { table: 'daily_rounds', type: 'daily_rounds' }],
@@ -38,39 +35,42 @@ const listKeys = ['type', 'category', 'value'];
 const taskKeys = ['animal_id', 'title', 'due_date', 'completed', 'assigned_to', 'type', 'notes'];
 
 export const bootCoreDatabase = async (): Promise<RxDatabase> => {
-  if (dbInstance) return dbInstance;
+  if ((window as any).dbInstance) return (window as any).dbInstance;
+  if ((window as any).dbPromise) return (window as any).dbPromise;
 
-  console.log(`🛡️ [Core DB] Booting Immortal Engine...`);
+  console.log("🛡️ [Core DB] Booting Immortal Engine...");
 
-  try {
-    const db = await createRxDatabase({ 
-      name: 'koa_manager_core_db_final',
-      storage: getRxStorageDexie(), 
-      multiInstance: false 
-    });
+  (window as any).dbPromise = (async () => {
+    try {
+      const db = await createRxDatabase({
+        name: 'koa_manager_core_db_final',
+        storage: getRxStorageDexie(),
+      });
 
-    await db.addCollections({
-      animals: { schema: { version: 0, primaryKey: 'id', type: 'object', additionalProperties: false, properties: { ...baseProps, ...makeProps(animalKeys) }, required: ['id', 'record_type'] } },
-      admin_records: { schema: { version: 0, primaryKey: 'id', type: 'object', additionalProperties: false, properties: { ...baseProps, ...makeProps(adminKeys) }, required: ['id', 'record_type'] } },
-      daily_records: { schema: { version: 0, primaryKey: 'id', type: 'object', additionalProperties: false, properties: { ...baseProps, ...makeProps(dailyKeys) }, required: ['id', 'record_type'] } },
-      clinical_records: { schema: { version: 0, primaryKey: 'id', type: 'object', additionalProperties: false, properties: { ...baseProps, ...makeProps(clinicalKeys) }, required: ['id', 'record_type'] } },
-      logistics_records: { schema: { version: 0, primaryKey: 'id', type: 'object', additionalProperties: false, properties: { ...baseProps, ...makeProps(logisticsKeys) }, required: ['id', 'record_type'] } },
-      staff_records: { schema: { version: 0, primaryKey: 'id', type: 'object', additionalProperties: false, properties: { ...baseProps, ...makeProps(staffKeys) }, required: ['id', 'record_type'] } },
-      maintenance_logs: { schema: { version: 0, primaryKey: 'id', type: 'object', additionalProperties: false, properties: { ...baseProps, ...makeProps(maintenanceKeys) }, required: ['id', 'record_type'] } },
-      incidents: { schema: { version: 0, primaryKey: 'id', type: 'object', additionalProperties: false, properties: { ...baseProps, ...makeProps(incidentKeys) }, required: ['id', 'record_type'] } },
-      first_aid_logs: { schema: { version: 0, primaryKey: 'id', type: 'object', additionalProperties: false, properties: { ...baseProps, ...makeProps(firstAidKeys) }, required: ['id', 'record_type'] } },
-      safety_drills: { schema: { version: 0, primaryKey: 'id', type: 'object', additionalProperties: false, properties: { ...baseProps, ...makeProps(safetyDrillKeys) }, required: ['id', 'record_type'] } },
-      operational_lists: { schema: { version: 0, primaryKey: 'id', type: 'object', additionalProperties: false, properties: { ...baseProps, ...makeProps(listKeys) }, required: ['id', 'record_type'] } },
-      tasks: { schema: { version: 0, primaryKey: 'id', type: 'object', additionalProperties: false, properties: { ...baseProps, ...makeProps(taskKeys) }, required: ['id', 'record_type'] } }
-    });
-    
-    dbInstance = db;
-    coreDB = db;
-    return dbInstance;
-  } catch (err) {
-    console.error("Fatal Database Boot Error:", err);
-    throw err;
-  }
+      await db.addCollections({
+        animals: { schema: { version: 0, primaryKey: 'id', type: 'object', additionalProperties: false, properties: { ...baseProps, ...makeProps(animalKeys) }, required: ['id', 'record_type'] } },
+        admin_records: { schema: { version: 0, primaryKey: 'id', type: 'object', additionalProperties: false, properties: { ...baseProps, ...makeProps(adminKeys) }, required: ['id', 'record_type'] } },
+        daily_records: { schema: { version: 0, primaryKey: 'id', type: 'object', additionalProperties: false, properties: { ...baseProps, ...makeProps(dailyKeys) }, required: ['id', 'record_type'] } },
+        clinical_records: { schema: { version: 0, primaryKey: 'id', type: 'object', additionalProperties: false, properties: { ...baseProps, ...makeProps(clinicalKeys) }, required: ['id', 'record_type'] } },
+        logistics_records: { schema: { version: 0, primaryKey: 'id', type: 'object', additionalProperties: false, properties: { ...baseProps, ...makeProps(logisticsKeys) }, required: ['id', 'record_type'] } },
+        staff_records: { schema: { version: 0, primaryKey: 'id', type: 'object', additionalProperties: false, properties: { ...baseProps, ...makeProps(staffKeys) }, required: ['id', 'record_type'] } },
+        maintenance_logs: { schema: { version: 0, primaryKey: 'id', type: 'object', additionalProperties: false, properties: { ...baseProps, ...makeProps(maintenanceKeys) }, required: ['id', 'record_type'] } },
+        incidents: { schema: { version: 0, primaryKey: 'id', type: 'object', additionalProperties: false, properties: { ...baseProps, ...makeProps(incidentKeys) }, required: ['id', 'record_type'] } },
+        first_aid_logs: { schema: { version: 0, primaryKey: 'id', type: 'object', additionalProperties: false, properties: { ...baseProps, ...makeProps(firstAidKeys) }, required: ['id', 'record_type'] } },
+        safety_drills: { schema: { version: 0, primaryKey: 'id', type: 'object', additionalProperties: false, properties: { ...baseProps, ...makeProps(safetyDrillKeys) }, required: ['id', 'record_type'] } },
+        operational_lists: { schema: { version: 0, primaryKey: 'id', type: 'object', additionalProperties: false, properties: { ...baseProps, ...makeProps(listKeys) }, required: ['id', 'record_type'] } },
+        tasks: { schema: { version: 0, primaryKey: 'id', type: 'object', additionalProperties: false, properties: { ...baseProps, ...makeProps(taskKeys) }, required: ['id', 'record_type'] } }
+      });
+
+      (window as any).dbInstance = db;
+      return db;
+    } catch (error) {
+      (window as any).dbPromise = null;
+      throw error;
+    }
+  })();
+
+  return (window as any).dbPromise;
 };
 
 export const destroyCoreDatabase = async () => {
@@ -83,11 +83,11 @@ export const startCoreSync = async () => {
   const db = await bootCoreDatabase();
 
   if (!navigator.onLine) {
-    console.warn('⚠️ [Core DB] Offline: Skipping Supabase replication setup.');
+    console.warn("⚠️ [Sync] Offline. Background replication suspended.");
     return;
   }
 
-  console.log('🔗 [Core DB] Engaging Pure Native Sync (No Proxies)...');
+  console.log("📡 [Sync] Online. Engaging Supabase Replication...");
 
   activeReplications.forEach(state => state.cancel());
   activeReplications.length = 0;
@@ -100,15 +100,14 @@ export const startCoreSync = async () => {
       try {
         const state = replicateSupabase({
           collection,
-          replicationIdentifier: `core_${colName}_${config.table}_sync_v6`, // 🚨 Master Reset v6
-          client: supabase, // 🚨 Passed pure and untouched
+          replicationIdentifier: `core_${colName}_${config.table}_sync_v6`,
+          client: supabase,
           tableName: config.table,
           deletedField: 'is_deleted',
           pull: { 
             batchSize: 100, 
             modifier: (doc: any) => {
               const cleanDoc = { ...doc };
-              // We can still use the native modifier to clean incoming data!
               if (!cleanDoc.id) cleanDoc.id = crypto.randomUUID(); 
               return { ...cleanDoc, id: String(cleanDoc.id), record_type: config.type, is_deleted: !!cleanDoc.is_deleted };
             } 
@@ -116,16 +115,12 @@ export const startCoreSync = async () => {
           push: { 
             modifier: (doc: any) => {
               if (doc.record_type !== config.type) return null;
-              
               const cleanDoc = { ...doc };
-              
-              // Stripping internal states for PostgREST compatibility
               delete cleanDoc._deleted;
               delete cleanDoc._attachments;
               delete cleanDoc._rev;
               delete cleanDoc._meta;
               delete cleanDoc.record_type; 
-              
               return cleanDoc;
             } 
           },

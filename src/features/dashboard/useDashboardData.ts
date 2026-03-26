@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Animal, AnimalCategory, LogType, LogEntry } from '../../types';
-import { coreDB, bootCoreDatabase } from '../../lib/DatabaseCore';
+import { bootCoreDatabase } from '../../lib/DatabaseCore';
 import { useTaskData } from '../husbandry/useTaskData';
 
 export interface EnhancedAnimal extends Animal {
@@ -35,7 +35,7 @@ export function useDashboardData(activeTab: AnimalCategory | 'ARCHIVED', viewDat
 
     const loadData = async () => {
       try {
-        const db = coreDB || await bootCoreDatabase();
+        const db = await bootCoreDatabase();
         if (!isMounted) return;
 
         const liveSub = db.animals.find({

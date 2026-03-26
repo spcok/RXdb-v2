@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { coreDB, bootCoreDatabase } from '../../lib/DatabaseCore';
+import { bootCoreDatabase } from '../../lib/DatabaseCore';
 import { Incident } from '../../types';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -15,7 +15,7 @@ export const useIncidentData = () => {
 
     const loadData = async () => {
       try {
-        const db = coreDB || await bootCoreDatabase();
+        const db = await bootCoreDatabase();
         if (!isMounted) return;
 
         sub = db.incidents.find().$.subscribe(docs => {
@@ -47,7 +47,7 @@ export const useIncidentData = () => {
   });
 
   const addIncident = async (incident: Omit<Incident, 'id'>) => {
-    const db = coreDB || await bootCoreDatabase();
+    const db = await bootCoreDatabase();
     const newIncident: Incident = { 
       ...incident, 
       id: uuidv4(),
@@ -58,7 +58,7 @@ export const useIncidentData = () => {
   };
 
   const deleteIncident = async (id: string) => {
-    const db = coreDB || await bootCoreDatabase();
+    const db = await bootCoreDatabase();
     const incidentDoc = await db.incidents.findOne(id).exec();
     if (incidentDoc) {
       const incident = incidentDoc.toJSON();

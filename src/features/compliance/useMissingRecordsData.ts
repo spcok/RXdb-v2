@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from 'react';
-import { coreDB, bootCoreDatabase } from '../../lib/DatabaseCore';
+import { bootCoreDatabase } from '../../lib/DatabaseCore';
 import { LogType, Animal, LogEntry, ClinicalNote } from '../../types';
 
 export interface MissingRecordAlert {
@@ -43,7 +43,7 @@ export function useMissingRecordsData() {
 
     const loadData = async () => {
       try {
-        const db = coreDB || await bootCoreDatabase();
+        const db = await bootCoreDatabase();
         if (!isMounted) return;
 
         const animalsSub = db.animals.find().$.subscribe(docs => {

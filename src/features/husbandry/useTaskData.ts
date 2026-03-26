@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { coreDB, bootCoreDatabase } from '../../lib/DatabaseCore';
+import { bootCoreDatabase } from '../../lib/DatabaseCore';
 import { Task, User, UserRole, Animal } from '../../types';
 
 const mockUsers: User[] = [
@@ -18,7 +18,7 @@ export const useTaskData = () => {
 
     const loadData = async () => {
       try {
-        const db = coreDB || await bootCoreDatabase();
+        const db = await bootCoreDatabase();
         if (!isMounted) return;
 
         subs = [
@@ -77,25 +77,25 @@ export const useTaskData = () => {
   }, [tasks, filter, searchTerm, currentUser.id, animals]);
 
   const addTask = async (newTask: Omit<Task, 'id'>) => {
-    const db = coreDB || await bootCoreDatabase();
+    const db = await bootCoreDatabase();
     const taskWithId = { ...newTask, id: crypto.randomUUID(), updated_at: new Date().toISOString(), is_deleted: false } as Task;
     await db.tasks.upsert(taskWithId);
   };
 
   const updateTask = async (id: string, updates: Partial<Task>) => {
-    const db = coreDB || await bootCoreDatabase();
+    const db = await bootCoreDatabase();
     const taskDoc = await db.tasks.findOne(id).exec();
     if (taskDoc) await db.tasks.upsert({ ...taskDoc.toJSON(), ...updates, updated_at: new Date().toISOString() });
   };
 
   const deleteTask = async (id: string) => {
-    const db = coreDB || await bootCoreDatabase();
+    const db = await bootCoreDatabase();
     const taskDoc = await db.tasks.findOne(id).exec();
     if (taskDoc) await db.tasks.upsert({ ...taskDoc.toJSON(), is_deleted: true, updated_at: new Date().toISOString() });
   };
 
   const toggleTaskCompletion = async (task: Task) => {
-    const db = coreDB || await bootCoreDatabase();
+    const db = await bootCoreDatabase();
     await db.tasks.upsert({ ...task, completed: !task.completed, updated_at: new Date().toISOString() });
   };
 

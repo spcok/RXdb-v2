@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuthStore } from '../store/authStore';
-import { coreDB, bootCoreDatabase } from '../lib/DatabaseCore';
+import { bootCoreDatabase } from '../lib/DatabaseCore';
 
 const lockedPermissions = {
   isAdmin: false, isOwner: false, isSeniorKeeper: false, isVolunteer: false, isStaff: false,
@@ -63,7 +63,7 @@ export function usePermissions() {
       }
 
       try {
-        const db = coreDB || await bootCoreDatabase();
+        const db = await bootCoreDatabase();
         if (!isMounted) return;
 
         subscription = db.admin_records.find({

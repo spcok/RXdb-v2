@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { coreDB, bootCoreDatabase } from '../../lib/DatabaseCore';
+import { bootCoreDatabase } from '../../lib/DatabaseCore';
 import { SafetyDrill } from '../../types';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -13,7 +13,7 @@ export function useSafetyDrillData() {
 
     const loadData = async () => {
       try {
-        const db = coreDB || await bootCoreDatabase();
+        const db = await bootCoreDatabase();
         if (!isMounted) return;
 
         sub = db.safety_drills.find().$.subscribe(docs => {
@@ -39,7 +39,7 @@ export function useSafetyDrillData() {
   }, []);
 
   const addDrillLog = async (drill: Omit<SafetyDrill, 'id'>) => {
-    const db = coreDB || await bootCoreDatabase();
+    const db = await bootCoreDatabase();
     const newDrill: SafetyDrill = {
       ...drill,
       id: uuidv4(),
@@ -50,7 +50,7 @@ export function useSafetyDrillData() {
   };
 
   const deleteDrillLog = async (id: string) => {
-    const db = coreDB || await bootCoreDatabase();
+    const db = await bootCoreDatabase();
     const drillDoc = await db.safety_drills.findOne(id).exec();
     if (drillDoc) {
       const drill = drillDoc.toJSON();

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { MessageSquareWarning, X, Send, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { useAuthStore } from '../../store/authStore';
-import { coreDB, bootCoreDatabase } from '../../lib/DatabaseCore';
+import { bootCoreDatabase } from '../../lib/DatabaseCore';
 
 const GlobalBugReporter: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -37,7 +37,7 @@ const GlobalBugReporter: React.FC = () => {
     };
 
     try {
-      const db = coreDB || await bootCoreDatabase();
+      const db = await bootCoreDatabase();
       if (db) {
         await db.admin_records.insert(payload);
       }

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { coreDB, bootCoreDatabase } from '../../lib/DatabaseCore';
+import { bootCoreDatabase } from '../../lib/DatabaseCore';
 import { Shift } from '../../types';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -13,7 +13,7 @@ export const useRotaData = () => {
 
     const loadData = async () => {
       try {
-        const db = coreDB || await bootCoreDatabase();
+        const db = await bootCoreDatabase();
         if (!isMounted) return;
 
         sub = db.staff_records.find({
@@ -44,7 +44,7 @@ export const useRotaData = () => {
   }, []);
 
   const createShift = async (shift: Omit<Shift, 'id' | 'pattern_id'>, repeatDays: number[], weeksToRepeat: number) => {
-    const db = coreDB || await bootCoreDatabase();
+    const db = await bootCoreDatabase();
     const pattern_id = uuidv4();
     const shiftsToCreate: Shift[] = [];
     
@@ -91,7 +91,7 @@ export const useRotaData = () => {
   };
 
   const updateShift = async (id: string, updates: Partial<Shift>, updateSeries: boolean = false) => {
-    const db = coreDB || await bootCoreDatabase();
+    const db = await bootCoreDatabase();
     if (updateSeries && updates.pattern_id) {
       const seriesShifts = await db.staff_records.find({
         selector: { 
@@ -127,7 +127,7 @@ export const useRotaData = () => {
   };
 
   const replaceShiftPattern = async (existingShift: Shift, newShiftData: Omit<Shift, 'id' | 'pattern_id'>, repeatDays: number[], weeksToRepeat: number) => {
-    const db = coreDB || await bootCoreDatabase();
+    const db = await bootCoreDatabase();
     if (existingShift.pattern_id) {
       const futureShifts = await db.staff_records.find({
         selector: {
@@ -159,7 +159,7 @@ export const useRotaData = () => {
   };
 
   const deleteShift = async (shift: Shift, deleteSeries: boolean = false) => {
-    const db = coreDB || await bootCoreDatabase();
+    const db = await bootCoreDatabase();
     if (deleteSeries && shift.pattern_id) {
       const seriesShifts = await db.staff_records.find({
         selector: {

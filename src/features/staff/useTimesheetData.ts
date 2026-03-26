@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { coreDB, bootCoreDatabase } from '../../lib/DatabaseCore';
+import { bootCoreDatabase } from '../../lib/DatabaseCore';
 import { Timesheet, TimesheetStatus } from '../../types';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -13,7 +13,7 @@ export function useTimesheetData() {
 
     const loadData = async () => {
       try {
-        const db = coreDB || await bootCoreDatabase();
+        const db = await bootCoreDatabase();
         if (!isMounted) return;
 
         sub = db.staff_records.find({
@@ -44,7 +44,7 @@ export function useTimesheetData() {
   }, []);
 
   const clockIn = async (staff_name: string) => {
-    const db = coreDB || await bootCoreDatabase();
+    const db = await bootCoreDatabase();
     const newTimesheet: Timesheet = {
       id: uuidv4(),
       record_type: 'timesheets',
@@ -59,7 +59,7 @@ export function useTimesheetData() {
   };
 
   const clockOut = async (id: string) => {
-    const db = coreDB || await bootCoreDatabase();
+    const db = await bootCoreDatabase();
     const timesheetDoc = await db.staff_records.findOne(id).exec();
     if (timesheetDoc) {
       const timesheet = timesheetDoc.toJSON();
@@ -74,7 +74,7 @@ export function useTimesheetData() {
   };
 
   const getCurrentlyClockedInStaff = async () => {
-    const db = coreDB || await bootCoreDatabase();
+    const db = await bootCoreDatabase();
     const active = await db.staff_records.find({
       selector: { 
         status: { $eq: TimesheetStatus.ACTIVE },
@@ -86,7 +86,7 @@ export function useTimesheetData() {
   };
 
   const addTimesheet = async (timesheet: Omit<Timesheet, 'id'>) => {
-    const db = coreDB || await bootCoreDatabase();
+    const db = await bootCoreDatabase();
     const newTimesheet: Timesheet = {
       ...timesheet,
       id: uuidv4(),
@@ -98,7 +98,7 @@ export function useTimesheetData() {
   };
 
   const deleteTimesheet = async (id: string) => {
-    const db = coreDB || await bootCoreDatabase();
+    const db = await bootCoreDatabase();
     const timesheetDoc = await db.staff_records.findOne(id).exec();
     if (timesheetDoc) {
       const timesheet = timesheetDoc.toJSON();

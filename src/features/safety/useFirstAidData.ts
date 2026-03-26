@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { coreDB, bootCoreDatabase } from '../../lib/DatabaseCore';
+import { bootCoreDatabase } from '../../lib/DatabaseCore';
 import { FirstAidLog } from '../../types';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -13,7 +13,7 @@ export function useFirstAidData() {
 
     const loadData = async () => {
       try {
-        const db = coreDB || await bootCoreDatabase();
+        const db = await bootCoreDatabase();
         if (!isMounted) return;
 
         sub = db.first_aid_logs.find().$.subscribe(docs => {
@@ -39,7 +39,7 @@ export function useFirstAidData() {
   }, []);
 
   const addFirstAid = async (log: Omit<FirstAidLog, 'id'>) => {
-    const db = coreDB || await bootCoreDatabase();
+    const db = await bootCoreDatabase();
     const newLog: FirstAidLog = {
       ...log,
       id: uuidv4(),
@@ -50,7 +50,7 @@ export function useFirstAidData() {
   };
 
   const deleteFirstAid = async (id: string) => {
-    const db = coreDB || await bootCoreDatabase();
+    const db = await bootCoreDatabase();
     const logDoc = await db.first_aid_logs.findOne(id).exec();
     if (logDoc) {
       const log = logDoc.toJSON();

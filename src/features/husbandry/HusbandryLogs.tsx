@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Plus, Loader2, Edit2, Trash2 } from 'lucide-react';
-import { coreDB, bootCoreDatabase } from '../../lib/DatabaseCore';
+import { bootCoreDatabase } from '../../lib/DatabaseCore';
 import AddEntryModal from './AddEntryModal';
 import { Animal, LogType, LogEntry } from '../../types';
 import { formatWeightDisplay, parseLegacyWeightToGrams } from '../../services/weightUtils';
@@ -26,7 +26,7 @@ export const HusbandryLogs: React.FC<Props> = ({ animalId, animal }) => {
 
     const loadData = async () => {
       try {
-        const db = coreDB || await bootCoreDatabase();
+        const db = await bootCoreDatabase();
         if (!isMounted) return;
 
         sub = db.daily_records.find({
@@ -64,7 +64,7 @@ export const HusbandryLogs: React.FC<Props> = ({ animalId, animal }) => {
 
   const handleSaveLog = async (entry: LogEntry) => {
     try {
-      const db = coreDB || await bootCoreDatabase();
+      const db = await bootCoreDatabase();
       await db.daily_records.upsert({
         ...entry,
         record_type: 'daily_logs_v2',
@@ -80,7 +80,7 @@ export const HusbandryLogs: React.FC<Props> = ({ animalId, animal }) => {
   const handleDeleteLog = async (id: string) => {
     if (!window.confirm('Are you sure you want to delete this log?')) return;
     try {
-      const db = coreDB || await bootCoreDatabase();
+      const db = await bootCoreDatabase();
       const doc = await db.daily_records.findOne(id).exec();
       if (doc) {
         await doc.patch({ is_deleted: true });

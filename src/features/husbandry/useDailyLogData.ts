@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState, useEffect } from 'react';
 import { LogEntry, LogType } from '../../types';
-import { coreDB, bootCoreDatabase } from '../../lib/DatabaseCore';
+import { bootCoreDatabase } from '../../lib/DatabaseCore';
 import { useAnimalsData } from '../animals/useAnimalsData';
 
 export const useDailyLogData = (viewDate: string, activeCategory: string) => {
@@ -14,7 +14,7 @@ export const useDailyLogData = (viewDate: string, activeCategory: string) => {
 
     const loadLogs = async () => {
       try {
-        const db = coreDB || await bootCoreDatabase();
+        const db = await bootCoreDatabase();
         if (!isMounted) return;
 
         // 🚨 NUCLEAR OPTION: No selectors at all. Fetch everything and filter in memory.
@@ -57,7 +57,7 @@ export const useDailyLogData = (viewDate: string, activeCategory: string) => {
   }, [logs]);
 
   const addLogEntry = useCallback(async (entry: Partial<LogEntry>) => {
-    const db = coreDB || await bootCoreDatabase();
+    const db = await bootCoreDatabase();
     const payload = {
       ...entry,
       id: entry.id || crypto.randomUUID(),

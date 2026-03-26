@@ -2,8 +2,7 @@ import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
 import { Session } from '@supabase/supabase-js';
 import { User } from '../types';
-import { bootCoreDatabase } from '../lib/DatabaseCore';
-import { startCoreSync } from '../lib/SyncEngine';
+import { bootCoreDatabase, startCoreSync } from '../lib/DatabaseCore';
 
 interface AuthState {
   session: Session | null;
@@ -28,7 +27,7 @@ const withTimeout = <T>(promise: Promise<T>, ms: number, errorMessage: string): 
   });
 };
 
-export const useAuthStore = create<AuthState>((set, get) => ({
+export const useAuthStore = create<AuthState>((set) => ({
   session: null,
   currentUser: null,
   isLoading: true,

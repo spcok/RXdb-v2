@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { coreDB, bootCoreDatabase } from '../../lib/DatabaseCore';
+import { bootCoreDatabase } from '../../lib/DatabaseCore';
 import { supabase } from '../../lib/supabase';
 
 export function useSystemHealthData() {
@@ -128,7 +128,7 @@ export function useSystemHealthData() {
 
     const updateCounts = async () => {
       try {
-        const db = coreDB || await bootCoreDatabase();
+        const db = await bootCoreDatabase();
         if (!isMounted) return;
 
         const counts = {
@@ -192,7 +192,7 @@ export function useSystemHealthData() {
     ];
 
     try {
-      const db = coreDB || await bootCoreDatabase();
+      const db = await bootCoreDatabase();
       for (let i = 0; i < tablesToWipe.length; i++) {
         const table = tablesToWipe[i];
         

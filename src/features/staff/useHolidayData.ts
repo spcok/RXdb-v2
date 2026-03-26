@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { coreDB, bootCoreDatabase } from '../../lib/DatabaseCore';
+import { bootCoreDatabase } from '../../lib/DatabaseCore';
 import { Holiday } from '../../types';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -13,7 +13,7 @@ export function useHolidayData() {
 
     const loadData = async () => {
       try {
-        const db = coreDB || await bootCoreDatabase();
+        const db = await bootCoreDatabase();
         if (!isMounted) return;
 
         sub = db.staff_records.find({
@@ -44,7 +44,7 @@ export function useHolidayData() {
   }, []);
 
   const addHoliday = async (holiday: Omit<Holiday, 'id'>) => {
-    const db = coreDB || await bootCoreDatabase();
+    const db = await bootCoreDatabase();
     const newHoliday: Holiday = {
       ...holiday,
       id: uuidv4(),
@@ -56,7 +56,7 @@ export function useHolidayData() {
   };
 
   const deleteHoliday = async (id: string) => {
-    const db = coreDB || await bootCoreDatabase();
+    const db = await bootCoreDatabase();
     const holidayDoc = await db.staff_records.findOne(id).exec();
     if (holidayDoc) {
       const holiday = holidayDoc.toJSON();

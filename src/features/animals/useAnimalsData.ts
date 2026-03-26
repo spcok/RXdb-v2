@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Animal } from '../../types';
-import { coreDB, bootCoreDatabase } from '../../lib/DatabaseCore';
+import { bootCoreDatabase } from '../../lib/DatabaseCore';
 
 export function useAnimalsData() {
   const [animals, setAnimals] = useState<Animal[]>([]);
@@ -13,7 +13,7 @@ export function useAnimalsData() {
 
     const loadAnimals = async () => {
       try {
-        const db = coreDB || await bootCoreDatabase();
+        const db = await bootCoreDatabase();
         if (!isMounted) return;
 
         // 🚨 Bulletproof Query: Ask for the record type, handle the booleans in-memory

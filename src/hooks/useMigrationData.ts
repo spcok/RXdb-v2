@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { coreDB, bootCoreDatabase } from '../lib/DatabaseCore';
+import { bootCoreDatabase } from '../lib/DatabaseCore';
 import { 
   Animal, 
   AnimalCategory, 
@@ -101,7 +101,7 @@ export const useMigrationData = () => {
     setError(null);
 
     try {
-      const db = coreDB || await bootCoreDatabase();
+      const db = await bootCoreDatabase();
       const animalsToImport: Animal[] = [];
       const logsToImport: LogEntry[] = [];
       const movementsToImport: InternalMovement[] = [];

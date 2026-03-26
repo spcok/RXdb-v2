@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { AnimalCategory, DailyRound, Animal, LogType, LogEntry } from '../../types';
-import { coreDB, bootCoreDatabase } from '../../lib/DatabaseCore';
+import { bootCoreDatabase } from '../../lib/DatabaseCore';
 import { v4 as uuidv4 } from 'uuid';
 
 interface AnimalCheckState {
@@ -31,7 +31,7 @@ export function useDailyRoundData(viewDate: string) {
 
         const loadData = async () => {
             try {
-                const db = coreDB || await bootCoreDatabase();
+                const db = await bootCoreDatabase();
                 if (!isMounted) return;
 
                 subs = [
@@ -158,7 +158,7 @@ export function useDailyRoundData(viewDate: string) {
         if (!isComplete || !signingInitials) return;
         setIsSubmitting(true);
         try {
-            const db = coreDB || await bootCoreDatabase();
+            const db = await bootCoreDatabase();
             const round: DailyRound = {
                 id: currentRoundId || uuidv4(),
                 record_type: 'daily_rounds',
